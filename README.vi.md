@@ -12,6 +12,15 @@ ccfleet hỗ trợ nhiều tài khoản Claude: chọn tài khoản cho từng p
 
 > Không liên kết với Anthropic. Claude và Claude Code là nhãn hiệu của Anthropic.
 
+## Vì sao dùng ccfleet
+
+| Vấn đề | Với ccfleet |
+|---|---|
+| Điều khiển từ xa qua app Claude chỉ tiếp tục được phiên đang mở, không tạo được phiên mới từ điện thoại | Tạo, bật, tắt, khởi động lại bất kỳ phiên nào, ở bất kỳ dự án nào, ngay từ điện thoại |
+| Chạy Claude Code bằng terminal hay VS Code thì mỗi phiên một cửa sổ, nặng máy, phải ngồi canh | Các phiên chạy nền, mỗi phiên một console riêng, có giới hạn RAM/CPU cho từng phiên; không cần IDE |
+| Phiên bị crash, cập nhật hay máy khởi động lại là mất phiên, phải tự mở lại | Tự khởi động lại và `--resume` đúng hội thoại cũ, kể cả sau khi máy khởi động lại |
+| Nhiều tài khoản Claude thì phải đăng nhập/đăng xuất trong từng terminal | Đăng nhập tài khoản ngay trên web, xem mức dùng 5h / 7 ngày, chọn tài khoản cho từng phiên |
+
 ## Tính năng
 
 - **Supervisor**

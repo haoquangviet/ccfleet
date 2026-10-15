@@ -18,6 +18,15 @@ It is plain Python (standard library plus Pillow) and needs no VS Code.
 
 ---
 
+## Why ccfleet
+
+| Pain point | With ccfleet |
+|---|---|
+| Remote control from the Claude app only continues a session that is already open; you cannot start a new one from your phone | Create, start, stop and restart any session from the web UI, on any project, from your phone |
+| Claude Code in a terminal or in VS Code means one heavy window per session that you have to keep open and babysit | Sessions run in the background, each in its own console, with per-session RAM/CPU caps; no IDE needed |
+| A crash, an update or a reboot kills the session and the conversation is gone until you reopen it by hand | Auto-restart with backoff and `--resume` of the same conversation, also after a reboot |
+| Several Claude accounts mean logging in and out in each terminal | Sign accounts in from the web, see 5h / 7-day usage, choose the account per session |
+
 ## Features
 
 **Supervisor (`ccfleet run`)**
