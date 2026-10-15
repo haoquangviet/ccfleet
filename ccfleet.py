@@ -359,6 +359,8 @@ def watch_screen(s: dict, st: dict) -> None:
         st["remote_url"] = screen[i:].split()[0]
     st["last_screen_tail"] = tail
     st["busy"] = is_busy(screen)
+    import fleet_web  # lazy: fleet_web imports ccfleet
+    st["asking"] = bool(fleet_web.menu_if_idle(screen))  # a question / permission menu waits for the user
     # bottom only: a conversation that merely talks about limits must not raise the flag
     st["limit_hit"] = any(m in "\n".join(screen.splitlines()[-12:]).lower() for m in LIMIT_MARKERS)
 

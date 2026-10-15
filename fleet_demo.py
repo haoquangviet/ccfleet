@@ -48,39 +48,81 @@ ACCS = {"personal": DEMO_DIR / "accounts" / "personal", "work": DEMO_DIR / "acco
 USAGE = {"personal": {"five_hour": 37.0, "seven_day": 58.0, "max": 58.0, "resets": None, "plan": "max"},
          "work": {"five_hour": 12.0, "seven_day": 81.0, "max": 81.0, "resets": None, "plan": "max"}}
 
-# name, account, pid (None = stopped), screen kind, conversation
-SESSIONS = [
-    ("web-shop", "personal", 91001, "busy", [
-        ("user", "The checkout page shows the wrong total when a coupon and free shipping are combined. Fix it and add a test."),
-        ("tool", "Read", {"file_path": "src/cart.ts"}),
-        ("assistant", "Found it: `applyCoupon()` runs after the shipping discount, so the coupon percentage is applied to "
-                      "a total that already excludes shipping. I'll reorder the steps and cover both cases with tests."),
-        ("tool", "Write", {"file_path": "src/cart.ts"}),
-        ("tool", "Write", {"file_path": "src/cart.test.ts"}),
-        ("tool", "Bash", {"command": "npm test -- cart"}),
-        ("assistant", "All 14 cart tests pass. Screenshot of the fixed checkout: docs/checkout-fixed.png"),
-        ("user", "Great. Now refactor the price formatting into a shared helper."),
-    ]),
-    ("api-server", "work", 91002, "menu", [
-        ("user", "Add rate limiting to the public endpoints (100 requests/minute per API key)."),
-        ("tool", "Read", {"file_path": "src/server.py"}),
-        ("assistant", "There are two reasonable ways to do this. Which do you prefer?"),
-    ]),
-    ("mobile-app", "personal", 91003, "idle", [
-        ("user", "Write release notes for version 2.4 from the git log since v2.3."),
-        ("tool", "Bash", {"command": "git log v2.3..HEAD --oneline"}),
-        ("tool", "Write", {"file_path": "RELEASE_NOTES.md"}),
-        ("assistant", "Done — RELEASE_NOTES.md has the 2.4 notes: offline mode, faster sync, dark-mode fixes and "
-                      "11 bug fixes. Want me to open a PR?"),
-    ]),
-    ("docs-site", "work", None, "idle", [
-        ("user", "Check every page for broken links."),
-        ("tool", "Bash", {"command": "npx linkinator ./build --recurse"}),
-        ("assistant", "No broken internal links. Two external links return 404: the old changelog URL and a "
-                      "deleted blog post. I listed them in docs/link-report.md."),
-        ("tool", "Write", {"file_path": "docs/link-report.md"}),
-    ]),
-]
+# name, account, pid (None = stopped), screen kind, conversation — per UI language (file names and
+# code identifiers stay English)
+CONVOS = {
+    "en": {
+        "web-shop": [
+            ("user", "The checkout page shows the wrong total when a coupon and free shipping are combined. Fix it and add a test."),
+            ("tool", "Read", {"file_path": "src/cart.ts"}),
+            ("assistant", "Found it: `applyCoupon()` runs after the shipping discount, so the coupon percentage is applied to "
+                          "a total that already excludes shipping. I'll reorder the steps and cover both cases with tests."),
+            ("tool", "Write", {"file_path": "src/cart.ts"}),
+            ("tool", "Write", {"file_path": "src/cart.test.ts"}),
+            ("tool", "Bash", {"command": "npm test -- cart"}),
+            ("assistant", "All 14 cart tests pass. Screenshot of the fixed checkout: docs/checkout-fixed.png"),
+            ("user", "Great. Now refactor the price formatting into a shared helper."),
+        ],
+        "api-server": [
+            ("user", "Add rate limiting to the public endpoints (100 requests/minute per API key)."),
+            ("tool", "Read", {"file_path": "src/server.py"}),
+            ("assistant", "There are two reasonable ways to do this. Which do you prefer?"),
+        ],
+        "mobile-app": [
+            ("user", "Write release notes for version 2.4 from the git log since v2.3."),
+            ("tool", "Bash", {"command": "git log v2.3..HEAD --oneline"}),
+            ("tool", "Write", {"file_path": "RELEASE_NOTES.md"}),
+            ("assistant", "Done — RELEASE_NOTES.md has the 2.4 notes: offline mode, faster sync, dark-mode fixes and "
+                          "11 bug fixes. Want me to open a PR?"),
+        ],
+        "docs-site": [
+            ("user", "Check every page for broken links."),
+            ("tool", "Bash", {"command": "npx linkinator ./build --recurse"}),
+            ("assistant", "No broken internal links. Two external links return 404: the old changelog URL and a "
+                          "deleted blog post. I listed them in docs/link-report.md."),
+            ("tool", "Write", {"file_path": "docs/link-report.md"}),
+        ],
+    },
+    "vi": {
+        "web-shop": [
+            ("user", "Trang thanh toán tính sai tổng tiền khi dùng mã giảm giá cùng miễn phí vận chuyển. Sửa giúp và thêm test."),
+            ("tool", "Read", {"file_path": "src/cart.ts"}),
+            ("assistant", "Tìm ra rồi: `applyCoupon()` chạy sau bước giảm phí ship, nên phần trăm giảm giá bị tính trên "
+                          "tổng đã trừ phí vận chuyển. Mình sẽ đổi thứ tự các bước và viết test cho cả hai trường hợp."),
+            ("tool", "Write", {"file_path": "src/cart.ts"}),
+            ("tool", "Write", {"file_path": "src/cart.test.ts"}),
+            ("tool", "Bash", {"command": "npm test -- cart"}),
+            ("assistant", "Cả 14 test giỏ hàng đều qua. Ảnh chụp trang thanh toán sau khi sửa: docs/checkout-fixed.png"),
+            ("user", "Tốt. Giờ tách phần định dạng giá tiền thành một helper dùng chung."),
+        ],
+        "api-server": [
+            ("user", "Thêm giới hạn tần suất cho các endpoint công khai (100 request/phút mỗi API key)."),
+            ("tool", "Read", {"file_path": "src/server.py"}),
+            ("assistant", "Có hai cách hợp lý để làm việc này. Bạn chọn cách nào?"),
+        ],
+        "mobile-app": [
+            ("user", "Viết release notes cho bản 2.4 từ git log kể từ v2.3."),
+            ("tool", "Bash", {"command": "git log v2.3..HEAD --oneline"}),
+            ("tool", "Write", {"file_path": "RELEASE_NOTES.md"}),
+            ("assistant", "Xong — RELEASE_NOTES.md đã có ghi chú bản 2.4: chế độ offline, đồng bộ nhanh hơn, sửa giao diện "
+                          "tối và 11 lỗi khác. Mở PR luôn nhé?"),
+        ],
+        "docs-site": [
+            ("user", "Kiểm tra link hỏng trên tất cả các trang."),
+            ("tool", "Bash", {"command": "npx linkinator ./build --recurse"}),
+            ("assistant", "Không có link nội bộ nào hỏng. Hai link ngoài trả về 404: URL changelog cũ và một bài blog "
+                          "đã xoá. Mình đã liệt kê trong docs/link-report.md."),
+            ("tool", "Write", {"file_path": "docs/link-report.md"}),
+        ],
+    },
+}
+LANG = ARGS.lang if ARGS.lang in CONVOS else "en"
+SESSIONS = [(n, acc, pid, kind, CONVOS[LANG][n]) for n, acc, pid, kind in (
+    ("web-shop", "personal", 91001, "busy"),
+    ("api-server", "work", 91002, "menu"),
+    ("mobile-app", "personal", 91003, "idle"),
+    ("docs-site", "work", None, "idle"),
+)]
 FILES = {
     "web-shop": {"src/cart.ts": "export function total(cart) { /* … */ }\n", "src/cart.test.ts": "test('coupon + free shipping', () => {})\n",
                  "docs/checkout-fixed.png": None, "package.json": '{"name": "web-shop"}\n', ".env": "SECRET=demo\n"},
@@ -88,22 +130,40 @@ FILES = {
     "mobile-app": {"RELEASE_NOTES.md": "# 2.4\n- Offline mode\n- Faster sync\n", "assets/icon.png": None},
     "docs-site": {"docs/link-report.md": "# Link report\n- 2 external 404s\n", "build/index.html": "<h1>Docs</h1>\n"},
 }
+# AskUserQuestion: header chip, question, options ("Type something." is Claude Code's own free-text row)
+_MENU = {
+    "en": ("Rate limit", "Where should the limiter live?",
+           "Middleware (one place, all routes)", "Per-route decorator (opt-in per endpoint)"),
+    "vi": ("Giới hạn tần suất", "Đặt bộ giới hạn ở đâu?",
+           "Middleware (một chỗ, áp cho mọi route)", "Decorator từng route (bật riêng từng endpoint)"),
+}[LANG]
 SCREENS = {
     "busy": ("● Reading src/format.ts\n\n"
              "✻ Refactoring… (1m 12s · ↓ 3.4k tokens · esc to interrupt)\n\n"
              " ╭──────────────────────────────────────────────╮\n │ >                                            │\n"
              " ╰──────────────────────────────────────────────╯\n   ⏵⏵ bypass permissions on (shift+tab to cycle)\n"),
-    "menu": (" Rate limit\n\nWhere should the limiter live?\n\n"
-             "❯ 1. Middleware (one place, all routes)\n"
-             "  2. Per-route decorator (opt-in per endpoint)\n"
+    "menu": (f" ☐ {_MENU[0]}\n\n{_MENU[1]}\n\n"
+             f"❯ 1. {_MENU[2]}\n"
+             f"  2. {_MENU[3]}\n"
              "  3. Type something.\n\n"
              "Enter to select · Esc to cancel\n"),
     "idle": ("● Done.\n\n ╭──────────────────────────────────────────────╮\n │ >                                            │\n"
              " ╰──────────────────────────────────────────────╯\n   ? for shortcuts\n"),
 }
+_TXT = {
+    "en": {"typed": "(demo) Got it. In a real session Claude Code would now work on: “{0}”",
+           "chose": "(demo) Choice {0} received — continuing.",
+           "rw": ("Goal", "Tasks", ["Find the relevant code", "Make the change", "Add or update tests"],
+                  "Done when", "tests pass and you report what changed.")},
+    "vi": {"typed": "(demo) Đã nhận. Trong phiên thật, Claude Code sẽ bắt tay làm: “{0}”",
+           "chose": "(demo) Đã nhận lựa chọn {0} — tiếp tục làm.",
+           "rw": ("Mục tiêu", "Việc cần làm", ["Tìm đoạn code liên quan", "Sửa theo yêu cầu", "Thêm hoặc cập nhật test"],
+                  "Xong khi", "test qua hết và báo lại đã đổi những gì.")},
+}[LANG]
 RUNNING: set[int] = set()
 PID_KIND: dict[int, str] = {}
 PID_NAME: dict[int, str] = {}
+MENU_POS: dict[int, int] = {}  # highlighted row of a demo menu
 _lock = threading.Lock()
 
 
@@ -206,14 +266,17 @@ def fake_console(*args: str, timeout: int = 20) -> str:
     cwd = str(PROJ / name)
     if op == "type":
         text = args[2] if len(args) > 2 else ""
-        reply = (f"(demo) Got it. In a real session Claude Code would now work on: “{text[:120]}”"
-                 if ARGS.lang == "en" else f"(demo) Đã nhận. Trong phiên thật, Claude Code sẽ làm: “{text[:120]}”")
+        reply = _TXT["typed"].format(text[:120])
         _append(name, [_entry(cwd, "user", 0, text)])
         threading.Timer(2.0, lambda: _append(name, [_entry(cwd, "assistant", 0, [{"type": "text", "text": reply}])])).start()
         PID_KIND[pid] = "idle"
-    elif op == "keys" and kind == "menu" and ("enter" in args[2:] or "esc" in args[2:]):
-        PID_KIND[pid] = "idle"
-        _append(name, [_entry(cwd, "assistant", 0, [{"type": "text", "text": "(demo) Choice received — continuing."}])])
+    elif op == "keys" and kind == "menu":
+        keys = args[2:]
+        MENU_POS[pid] = min(3, max(1, MENU_POS.get(pid, 1) + keys.count("down") - keys.count("up")))
+        if "enter" in keys or "esc" in keys:
+            PID_KIND[pid] = "idle"
+        if "enter" in keys:
+            _append(name, [_entry(cwd, "assistant", 0, [{"type": "text", "text": _TXT["chose"].format(MENU_POS[pid])}])])
     return ""
 
 
@@ -238,6 +301,18 @@ def demo_action(name: str, act: str, account: str | None = None) -> None:
         ccfleet.save_json(ccfleet.STATE, state)
 
 
+_real_state = fleet_web.state_payload
+
+
+def demo_state() -> dict:
+    """No supervisor watches the fake screens here: a running session showing a menu is "asking"."""
+    d = _real_state()
+    kinds = {PID_NAME[p]: PID_KIND[p] for p in RUNNING if p in PID_NAME}
+    for s in d["sessions"]:
+        s["asking"] = s["status"] == "running" and not s["busy"] and kinds.get(s["name"]) == "menu"
+    return d
+
+
 def _no_login(*_a, **_k):
     raise ValueError("signing in to a Claude account is disabled in demo mode")
 
@@ -249,14 +324,15 @@ def patch() -> None:
     ccfleet.log = lambda msg: None
     fleet_accounts.usage = lambda acc: next((u for n, u in USAGE.items() if str(ACCS[n]) == acc.get("config_dir")), None)
     fleet_accounts.signed_in = lambda acc: True
+    goal, tasks, items, done, when = _TXT["rw"]
     fleet_rewrite.rewrite = lambda text, cfg=None: (
         text if text.strip().startswith("/") else
-        f"**Goal:** {text.strip()}\n\n**Tasks:**\n- Find the relevant code\n- Make the change\n- Add or update tests\n\n"
-        "**Done when:** tests pass and you report what changed.")
+        f"**{goal}:** {text.strip()}\n\n**{tasks}:**\n" + "".join(f"- {x}\n" for x in items) + f"\n**{done}:** {when}")
     fleet_login.start = fleet_login.submit_code = _no_login
     fleet_login.poll = lambda name: {"state": "failed", "error": "disabled in demo mode"}
     fleet_login.cancel = lambda name: None
     fleet_web.session_action = demo_action
+    fleet_web.state_payload = demo_state
     fleet_web.DEMO = True
 
 

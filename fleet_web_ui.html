@@ -18,7 +18,7 @@ main{max-width:980px;margin:0 auto;padding:12px 14px calc(150px + env(safe-area-
 @media (min-width:900px){
   main{max-width:1320px}
   #shell{display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start}
-  #side{display:block;position:sticky;top:64px;max-height:calc(100vh - 80px);overflow-y:auto;padding-right:2px}
+  #side{display:block;position:sticky;top:64px;max-height:calc(100vh - 80px);max-height:calc(100dvh - 80px);overflow-y:auto;padding-right:2px}
   #side.hide-desktop{display:none}            /* only login / setup hide the fixed panel */
   .composer .row{max-width:1320px;padding-left:338px}  /* align composer under the right pane */
 }
@@ -40,9 +40,10 @@ main{max-width:980px;margin:0 auto;padding:12px 14px calc(150px + env(safe-area-
 .sitem.sel .nm{font-weight:600}
 .sitem.dim .nm{color:var(--mut)}
 .sitem .mach{font-size:10.5px;color:var(--mut);border:1px solid var(--bd);border-radius:999px;padding:0 6px;flex:none}
-.railfoot{margin-top:14px;padding-top:10px;border-top:1px solid var(--bd);display:grid;gap:7px}
+.railfoot{margin-top:14px;padding-top:10px;border-top:1px solid var(--bd);display:grid;grid-template-columns:minmax(0,1fr);gap:7px}
+.profoot{padding:0 10px;font-size:11px;line-height:1.45;color:var(--mut);overflow-wrap:anywhere}.profoot a{color:var(--mut)}
 .acctrow{display:flex;align-items:center;gap:6px;font-size:12px}
-.acctrow b{min-width:44px}
+.acctrow b{min-width:44px;max-width:38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.acctrow .bar{min-width:24px}
 @media (max-width:899px){#side .rail{gap:2px}.navitem,.sitem{padding:9px 12px}}
 button{font:inherit;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:8px;padding:7px 12px;cursor:pointer}
 button.pri{background:var(--pri);border-color:var(--pri);color:#fff}button.dan{color:var(--err)}
@@ -52,7 +53,7 @@ input,textarea{font:inherit;width:100%;padding:9px 11px;border:1px solid var(--b
 #sHead{position:sticky;top:var(--hh,56px);z-index:4;box-shadow:0 4px 10px rgba(0,0,0,.12)}
 .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.mut{color:var(--mut);font-size:13px}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--mut)}
-.dot.running{background:var(--ok)}.dot.busy{background:var(--warn)}.dot.down{background:var(--err)}
+.dot.running{background:var(--ok)}.dot.busy{background:var(--warn)}.dot.ask{background:var(--pri)}.dot.down{background:var(--err)}
 .tag{font-size:12px;border:1px solid var(--bd);border-radius:999px;padding:1px 8px}.tag.lim{color:var(--err);border-color:var(--err)}
 .tag.demo{color:var(--warn);border-color:var(--warn)}
 .tabs{display:flex;gap:6px;margin:6px 0 10px}.tabs button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
@@ -66,7 +67,7 @@ pre.screen{background:var(--code);color:var(--codefg);padding:10px;border-radius
 #quick button{padding:5px 10px;font-size:13px;white-space:nowrap;flex:none}
 #btnMore{margin-left:auto}
 #cmdMenu{position:absolute;right:0;bottom:calc(100% + 6px);z-index:20;background:var(--card);border:1px solid var(--bd);border-radius:10px;
-  box-shadow:0 6px 24px rgba(0,0,0,.18);padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px;width:min(440px,calc(100vw - 24px));max-height:60vh;overflow:auto}
+  box-shadow:0 6px 24px rgba(0,0,0,.18);padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px;width:min(440px,calc(100vw - 24px));max-height:60vh;max-height:60dvh;overflow:auto}
 #cmdMenu[hidden]{display:none}#cmdMenu .mut{grid-column:1/-1;font-size:12px;margin-top:2px}
 #cmdMenu button{text-align:left;white-space:normal!important}#cmdMenu button .mut{display:block;font-size:11px}
 .composer .row{max-width:980px;margin:0 auto;flex-wrap:nowrap}.composer textarea{min-height:42px;max-height:160px;resize:vertical}
@@ -77,7 +78,7 @@ a{color:var(--pri)}
 #rpane{display:none;font-size:14px}
 @media (min-width:1280px){
   #shell.three{grid-template-columns:280px minmax(0,1fr) 340px}
-  #shell.three #rpane{display:block;position:sticky;top:64px;max-height:calc(100vh - 80px);overflow-y:auto}
+  #shell.three #rpane{display:block;position:sticky;top:64px;max-height:calc(100vh - 80px);max-height:calc(100dvh - 80px);overflow-y:auto}
   main.three{max-width:1700px}
   .composer.three .row{max-width:1700px;padding-left:298px;padding-right:358px}
   .rpTog{display:none}
@@ -85,8 +86,22 @@ a{color:var(--pri)}
 @media (max-width:1279px){#rpane.open{display:block;position:fixed;right:0;top:var(--hh,56px);bottom:0;width:min(380px,94vw);z-index:30;
   background:var(--bg);border-left:1px solid var(--bd);overflow-y:auto;padding:10px;box-shadow:-6px 0 20px rgba(0,0,0,.25)}}
 #sHead{padding:8px 10px}
-.hrow{flex-wrap:nowrap}.hrow>b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:40px;max-width:32%}
-.hrow .accSel{max-width:120px}
+.hrow{flex-wrap:wrap;row-gap:6px}.hrow>b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:40px;max-width:32%}
+.hrow .accSel{max-width:120px}.hrow .hst{white-space:nowrap}.hst.ask,.sitem .when.ask{color:var(--warn);font-weight:600}
+.hbreak{display:none}
+/* phones: name · account · state on the first row, tabs + actions on the second — nothing may overflow */
+@media (max-width:899px){
+  html,body{overflow-x:clip}
+  .hbreak{display:block;flex-basis:100%;height:0}
+  .hrow>b{flex:0 1 auto;max-width:42%}
+  .hrow .accSel{max-width:104px}
+  .hrow .accGo{padding:4px 9px;font-size:13px}
+  .hrow .seg button{padding:5px 9px}
+  header{flex-wrap:wrap;row-gap:4px}header #sup{white-space:nowrap}
+  #btnBack{padding:5px 10px}
+  .tag.demo .dl{display:none}
+}
+@media (min-width:900px){.tag.demo .ds{display:none}}
 .seg{display:inline-flex;flex:none}.seg button{border-radius:0;padding:5px 10px}.seg button:first-child{border-radius:8px 0 0 8px}
 .seg button+button{border-left:0}.seg button:last-child{border-radius:0 8px 8px 0}.seg button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
 .dd{position:relative;flex:none}.ddm{position:absolute;right:0;top:calc(100% + 4px);z-index:25;background:var(--card);border:1px solid var(--bd);border-radius:10px;
@@ -96,6 +111,7 @@ a{color:var(--pri)}
 .ritem{border:1px solid var(--bd);border-radius:8px;padding:8px;margin-bottom:6px;background:var(--card);font-size:13px;overflow-wrap:anywhere}
 .ritem img,.ritem video{max-width:100%;max-height:220px;border-radius:6px;display:block;margin-bottom:4px}
 .ritem audio{width:100%}.ritem button{padding:3px 8px;font-size:12px}
+.menu .mhead{margin-top:6px}.menu .mhead .tag{font-weight:600;color:var(--pri);border-color:var(--pri)}.menu .mq{margin-top:4px}
 .msg.pend{opacity:.8;border:1px dashed var(--bd)}.msg .q{font-size:12px;color:var(--warn)}
 /* ---- app shell — desktop only; phones keep the page scroll ---- */
 select{font:inherit;color:var(--fg);background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 9px center;
@@ -104,7 +120,7 @@ select:hover{border-color:color-mix(in srgb,var(--fg) 25%,var(--bd))}select:focu
 .hrow select.accSel{padding:4px 26px 4px 9px;font-size:13px}
 @media (min-width:900px){
   html,body{height:100%;overflow:hidden}
-  main,main.three{max-width:none;margin:0;padding:0;height:calc(100dvh - var(--hh,56px))}
+  main,main.three{max-width:none;margin:0;padding:0;height:calc(100vh - var(--hh,56px));height:calc(100dvh - var(--hh,56px))}
   #shell{height:100%;gap:0;grid-template-columns:280px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;align-items:stretch}
   #shell.three{grid-template-columns:280px minmax(0,1fr) 340px}
   #side{grid-row:1/3;grid-column:1;position:static;top:auto;max-height:none;height:100%;overflow-y:auto;padding:8px 8px 16px;
@@ -174,7 +190,7 @@ en:{
   setup_hint:'Choose a password (12+ characters), then add the key to your authenticator app (Google Authenticator, 1Password…).',
   new_pw:'New password',cont:'Continue',open_auth:'Open authenticator app',or_key:'or enter the key:',otp_app:'6-digit code from the app',confirm:'Confirm',
   sup_on:'supervisor',sup_off:'supervisor off',nav_new:'New project',nav_proj:'Projects',nav_skills:'Skills',
-  st_stopped:'stopped',st_working:'working',st_idle:'idle',st_elsewhere:'elsewhere',st_off:'off',minutes:'{0}m',
+  st_stopped:'stopped',st_working:'working',st_idle:'idle',st_asking:'waiting for you',st_elsewhere:'elsewhere',st_off:'off',minutes:'{0}m',
   acct_t:'Claude account',limit_t:'usage limit reached',no_sessions:'No sessions yet',no_accounts:'No accounts yet',
   add_acc:'Add account',signout:'Sign out',signout2:'Click again to sign out',pick:'Pick a session on the left, or create a new project.',
   acc_title:'Add a Claude account',acc_hint:'1) Pick a name (e.g. work) → 2) open the link and sign in with that Claude account → 3) paste the code it shows here.',
@@ -186,10 +202,10 @@ en:{
   sk_native:"Project's own skills (left untouched): ",sk_own:'own',
   f_root:'root',f_upload:'⬆ Upload',f_newdir:'New folder name',f_mk:'+ Folder',f_sendto:'Send to session:',f_note:'Note to include (e.g. fix the bug in this screenshot)',
   f_nosess:'No ccfleet session for this project yet — open one from "Projects" to send file paths.',del:'Delete',sure:'Sure?',empty:'Empty folder',sent:'✓ Sent',
-  att_need:'📎 Open a session first',att_fail:'📎 Upload failed: ',m_asking:'Claude is asking',m_scroll:'scroll to see more options',
+  att_need:'📎 Open a session first',att_fail:'📎 Upload failed: ',m_asking:'Claude is asking',m_scroll:'scroll to see more options',m_free:'Type your own answer…',
   pr_title:'Projects (from Claude Code history)',pr_n:'{0} sessions',pr_none:'No Claude Code history found yet.',
   p_files:'📁 Files',p_new:'+ New session',p_recent:'{0} recent sessions · "Reopen" continues the exact conversation',managed:'Managed as: {0}',reopen:'Reopen',untitled:'(untitled)',
-  back:'Back',s_working:'working…',s_idle:'idle',s_else:'open elsewhere',s_off:'off',chat:'Chat',screen:'Screen',takeover:'Takeover',startB:'Start',
+  back:'Back',s_working:'working…',s_idle:'idle',s_asking:'waiting for you',s_else:'open elsewhere',s_off:'off',chat:'Chat',screen:'Screen',takeover:'Takeover',startB:'Start',
   files_t:'Session files',rename:'✎ Rename',restart:'↻ Restart',stop:'■ Stop',projfiles:'📁 Project files',open_ai:'↗ Open on claude.ai',
   newname:'New session name:',sentA:'Sent: {0}',no_msgs:'No messages yet',responding:'● responding…',stop2:'Click again to stop',
   queued:'⏳ queued — the session picks it up after the current turn',
@@ -201,7 +217,7 @@ en:{
   rp_none:"No files found in this project's conversations yet — see 📁 Project.",error:'error',
   clear_q:'Clear context?',rw_need:'Type a prompt first, then click ✨ Rewrite',up_img:'uploading image {0} KB…',paste_fail:'Image paste failed: ',
   acc_sel_t:'Claude account for this session',switch:'Switch account',switch_t:'Copy the conversation to this account, close the running copy and reopen it (--resume)',
-  switch_busy:'Working — click again to interrupt & switch',switching:'Switching to {0}…',
+  switch_busy:'Working — click again to interrupt & switch',switching:'Switching to {0}…',switched:'✓ Switched to {0} — the conversation continues there',
   pro:'ccfleet Pro: multi-machine, share links, MCP, task queue →',contact:'Contact'
 },
 vi:{
@@ -218,7 +234,7 @@ vi:{
   setup_hint:'Đặt mật khẩu (≥12 ký tự), rồi thêm mã vào app xác thực (Google Authenticator…).',
   new_pw:'Mật khẩu mới',cont:'Tiếp tục',open_auth:'Mở app xác thực',or_key:'hoặc nhập khoá:',otp_app:'Nhập mã 6 số từ app',confirm:'Xác nhận',
   sup_on:'supervisor',sup_off:'supervisor tắt',nav_new:'Tạo dự án',nav_proj:'Dự án',nav_skills:'Skills',
-  st_stopped:'đã dừng',st_working:'đang làm',st_idle:'rảnh',st_elsewhere:'nơi khác',st_off:'tắt',minutes:'{0}p',
+  st_stopped:'đã dừng',st_working:'đang làm',st_idle:'rảnh',st_asking:'đang hỏi',st_elsewhere:'nơi khác',st_off:'tắt',minutes:'{0}p',
   acct_t:'Tài khoản Claude',limit_t:'hết hạn mức',no_sessions:'Chưa có phiên',no_accounts:'Chưa có tài khoản',
   add_acc:'Thêm tài khoản',signout:'Thoát',signout2:'Bấm lần nữa để thoát',pick:'Chọn một phiên bên trái để xem chi tiết, hoặc tạo dự án mới.',
   acc_title:'Thêm tài khoản Claude',acc_hint:'1) Đặt tên (vd: work) → 2) mở link, đăng nhập đúng tài khoản Claude → 3) dán mã hiện ra vào đây.',
@@ -230,10 +246,10 @@ vi:{
   sk_native:'Skill gốc của dự án (không đổi): ',sk_own:'gốc',
   f_root:'gốc',f_upload:'⬆ Tải lên',f_newdir:'Tên thư mục mới',f_mk:'+ Thư mục',f_sendto:'Gửi cho phiên:',f_note:'Ghi chú kèm (vd: sửa lỗi trong ảnh này)',
   f_nosess:'Dự án chưa có phiên ccfleet — mở phiên trong "Dự án" để gửi đường dẫn.',del:'Xoá',sure:'Chắc chưa?',empty:'Thư mục trống',sent:'✓ Đã gửi',
-  att_need:'📎 Mở một phiên trước',att_fail:'📎 Tải lên lỗi: ',m_asking:'Claude đang hỏi',m_scroll:'cuộn để xem các mục khác',
+  att_need:'📎 Mở một phiên trước',att_fail:'📎 Tải lên lỗi: ',m_asking:'Claude đang hỏi',m_scroll:'cuộn để xem các mục khác',m_free:'Tự nhập câu trả lời…',
   pr_title:'Dự án (từ lịch sử Claude Code)',pr_n:'{0} phiên',pr_none:'Chưa thấy lịch sử Claude Code.',
   p_files:'📁 Tệp',p_new:'+ Phiên mới',p_recent:'{0} phiên gần nhất · bấm "Mở lại" để tiếp tục đúng hội thoại',managed:'Đang quản lý: {0}',reopen:'Mở lại',untitled:'(không có tiêu đề)',
-  back:'Quay lại',s_working:'đang làm…',s_idle:'rảnh',s_else:'mở nơi khác',s_off:'tắt',chat:'Hội thoại',screen:'Màn hình',takeover:'Tiếp quản',startB:'Chạy',
+  back:'Quay lại',s_working:'đang làm…',s_idle:'rảnh',s_asking:'đang hỏi',s_else:'mở nơi khác',s_off:'tắt',chat:'Hội thoại',screen:'Màn hình',takeover:'Tiếp quản',startB:'Chạy',
   files_t:'Tệp của phiên',rename:'✎ Đổi tên',restart:'↻ Khởi động lại',stop:'■ Dừng',projfiles:'📁 Tệp dự án',open_ai:'↗ Mở trên claude.ai',
   newname:'Tên mới cho phiên:',sentA:'Đã gửi: {0}',no_msgs:'Chưa có nội dung',responding:'● đang trả lời…',stop2:'Bấm lần nữa để dừng',
   queued:'⏳ đang xếp hàng — phiên nhận khi xong lượt',
@@ -245,7 +261,7 @@ vi:{
   rp_none:'Chưa thấy tệp nào trong các hội thoại của dự án — xem 📁 Dự án.',error:'lỗi',
   clear_q:'Xoá ngữ cảnh?',rw_need:'Gõ prompt vào ô trước, rồi bấm ✨ Viết lại',up_img:'đang tải ảnh {0} KB…',paste_fail:'Dán ảnh lỗi: ',
   acc_sel_t:'Tài khoản Claude của phiên',switch:'Chuyển & tiếp quản',switch_t:'Chép hội thoại sang tài khoản này, đóng bản đang chạy rồi mở lại (--resume)',
-  switch_busy:'Đang làm — bấm lần nữa để ngắt & chuyển',switching:'Đang chuyển sang {0}…',
+  switch_busy:'Đang làm — bấm lần nữa để ngắt & chuyển',switching:'Đang chuyển sang {0}…',switched:'✓ Đã chuyển sang {0} — hội thoại tiếp tục ở đó',
   pro:'ccfleet Pro: nhiều máy, link chia sẻ, MCP, hàng đợi task →',contact:'Liên hệ'
 }};
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
@@ -260,7 +276,7 @@ function applyStatic(){document.documentElement.lang=lang;
   document.querySelectorAll('[data-i]').forEach(el=>{el.textContent=(el.id==='btnBack'?'‹ ':'')+t(el.dataset.i)});
   document.querySelectorAll('[data-it]').forEach(el=>el.title=t(el.dataset.it));
   document.querySelectorAll('[data-ip]').forEach(el=>el.placeholder=t(el.dataset.ip));
-  $('#demoTag').innerHTML=isDemo?`<span class="tag demo" title="${esc(t('demo_t'))}">${esc(t('demo_tag'))}</span>`:'';
+  $('#demoTag').innerHTML=isDemo?`<span class="tag demo" title="${esc(t('demo_t'))}"><span class="dl">${esc(t('demo_tag'))}</span><span class="ds">${esc(t('demo_short'))}</span></span>`:'';
   updBack()}
 const langSeg=()=>`<span class="seg langSeg" title="${esc(t('lang_t'))}"><button data-lang="en" class="${lang==='en'?'on':''}">EN</button><button data-lang="vi" class="${lang==='vi'?'on':''}">VI</button></span>`;
 let onLogin=null;   // set while the login page is shown, so a language switch re-renders it
@@ -391,11 +407,11 @@ function railHTML(s){
     <div class="seclabel">${esc(t('sessions'))}<span class="sp"></span><span class="ic" style="color:var(--mut)">${IC.filt}</span></div>`;
   const all=s.sessions||[];
   const sess=all.length?all.map(x=>{
-    const st=x.stopped?'down':x.busy?'busy':x.status==='running'?'running':x.status==='elsewhere'?'':'down';
-    const w=x.stopped?t('st_stopped'):x.busy?t('st_working'):x.status==='running'?(x.up_min!=null?t('minutes',x.up_min):t('st_idle')):x.status==='elsewhere'?t('st_elsewhere'):t('st_off');
+    const st=x.stopped?'down':x.busy?'busy':x.asking?'ask':x.status==='running'?'running':x.status==='elsewhere'?'':'down';
+    const w=x.stopped?t('st_stopped'):x.busy?t('st_working'):x.asking?t('st_asking'):x.status==='running'?(x.up_min!=null?t('minutes',x.up_min):t('st_idle')):x.status==='elsewhere'?t('st_elsewhere'):t('st_off');
     return `<div class="sitem${x.name===cur?' sel':''}${x.stopped||x.status==='down'?' dim':''}" data-n="${esc(x.name)}">
       <span class="dot ${st}"></span><span class="nm">${esc(x.name)}</span>
-      ${x.account?`<span class="mach" title="${esc(t('acct_t'))}">${esc(x.account)}</span>`:''}${x.limit?`<span class="when" title="${esc(t('limit_t'))}">⚠</span>`:''}<span class="when">${esc(w)}</span></div>`;}).join('')
+      ${x.account?`<span class="mach" title="${esc(t('acct_t'))}">${esc(x.account)}</span>`:''}${x.limit?`<span class="when" title="${esc(t('limit_t'))}">⚠</span>`:''}<span class="when${x.asking&&!x.busy&&!x.stopped?' ask':''}">${esc(w)}</span></div>`;}).join('')
     :`<div class="mut" style="padding:8px 10px">${esc(t('no_sessions'))}</div>`;
   const acc=Object.entries(s.accounts).map(([n,u])=>`<div class="acctrow" title="${esc((s.account_info[n]||{}).email||'')}"><b>${esc(n)}</b>${u?
     `<span class="mut">5h</span><div class="bar"><i style="width:${u.five_hour}%;${u.five_hour>85?'background:var(--err)':''}"></i></div><span class="mut">${Math.round(u.five_hour)}</span>
@@ -405,7 +421,7 @@ function railHTML(s){
       <button class="navitem" id="btnAcc" style="font-size:13px"><span class="ic">${IC.new}</span>${esc(t('add_acc'))}</button>
       <button class="navitem" id="btnOut" style="font-size:13px;color:var(--mut)"><span class="ic">${IC.out}</span>${esc(t('signout'))}</button>
       <div style="padding:2px 10px">${langSeg()}</div>
-      <div style="padding:0 10px;font-size:11px;color:var(--mut)">${esc(t('pro'))} <a href="mailto:CONTACT_EMAIL" style="color:var(--mut)">${esc(t('contact'))}</a></div></div></div>`;
+      <div class="profoot">${esc(t('pro'))} <a href="mailto:CONTACT_EMAIL">${esc(t('contact'))}</a></div></div></div>`;
 }
 function wireRail(root,accounts){
   root.querySelectorAll('[data-n]').forEach(el=>el.onclick=()=>showSession(el.dataset.n));
@@ -576,9 +592,9 @@ function renderMenu(el,menu,send,keys){
   const nav=(menu.scroll&&keys)?`<div class="row" style="margin-top:8px;gap:6px">
       <button data-mv="up">↑</button><button data-mv="down">↓</button>
       <span class="mut">${esc(t('m_scroll'))}</span></div>`:'';
-  el.innerHTML=`<div class="card menu" style="border-color:var(--pri)"><div class="mut">${esc(t('m_asking'))}${menu.question?': <b>'+esc(menu.question)+'</b>':''}</div>
+  el.innerHTML=`<div class="card menu" style="border-color:var(--pri)"><div class="mut">${esc(t('m_asking'))}${menu.header||menu.question?':':''}</div>${menu.header?`<div class="mhead"><span class="tag">${esc(menu.header)}</span></div>`:''}${menu.question?`<div class="mq"><b>${esc(menu.question)}</b></div>`:''}
     <div style="display:grid;gap:6px;margin-top:8px">${menu.options.map(o=>o.free
-      ?`<div class="row" style="flex-wrap:nowrap"><input data-free="${o.n}" placeholder="${esc(o.label)}" style="flex:1"><button class="pri" data-fs="${o.n}">${esc(t('send'))}</button></div>`
+      ?`<div class="row" style="flex-wrap:nowrap"><input data-free="${o.n}" placeholder="${esc(t('m_free'))}" title="${esc(o.label)}" style="flex:1"><button class="pri" data-fs="${o.n}">${esc(t('send'))}</button></div>`
       :`<button data-ch="${o.n}" style="text-align:left${o.n===menu.current?';border-color:var(--pri)':''}">${o.n}. ${esc(o.label)}</button>`).join('')}</div>${nav}</div>`;
   el.querySelectorAll('[data-mv]').forEach(b=>b.onclick=async()=>{
     try{await keys([b.dataset.mv]);menuSig='';setTimeout(()=>redraw&&redraw(),350)}catch(e){if(e)alertBar(e.message)}});
@@ -609,15 +625,15 @@ async function showProject(cwd){
 }
 async function showSession(name){
   cur=name;clearInterval(timer);$('#composer').hidden=false;paneView();setHash(['session',name,tab]);
-  const enc=encodeURIComponent(name);let ver='',msgs=[],live='',screen='',info={},gen=(showSession.gen=(showSession.gen||0)+1);
+  const enc=encodeURIComponent(name);let ver='',msgs=[],live='',screen='',info={},askNow=false,gen=(showSession.gen=(showSession.gen||0)+1);
   // header (status/actions/tabs) refreshes every 8 s; the body streams via long-poll /watch
   app.innerHTML=`<div class="card" id="sHead"></div><div id="sBody"></div><div id="sPend"></div><div id="sLive"></div><div id="sMenu"></div>`;menuSig='';loadDraft();
   const head=async()=>{if(cur!==name)return;const stAll=await api('/api/state');info=stAll.sessions.find(x=>x.name===name)||{};const s=info;
     if(isWide())paintRail(stAll);else lastState=stAll;   // keep the rail live + highlight current
-    const run=s.status==='running';
+    const run=s.status==='running';if(!s.busy&&askNow)s.asking=true;
     $('#sHead').innerHTML=`<div class="row hrow"><button class="hBack" title="${esc(t('back'))}">‹</button><b title="${esc(name)}">${esc(name)}</b>${accPick(Object.keys(stAll.accounts||{}),s.account,stAll.account_info)}
-      <span class="mut" style="white-space:nowrap">${esc(s.busy?t('s_working'):run?t('s_idle'):s.status==='elsewhere'?t('s_else'):t('s_off'))}</span>
-      <span class="seg"><button data-t="messages" class="${tab==='messages'?'on':''}">${esc(t('chat'))}</button><button data-t="screen" class="${tab==='screen'?'on':''}">${esc(t('screen'))}</button></span>
+      <span class="mut hst${run&&!s.busy&&s.asking?' ask':''}">${esc(s.busy?t('s_working'):run&&s.asking?t('s_asking'):run?t('s_idle'):s.status==='elsewhere'?t('s_else'):t('s_off'))}</span>
+      <span class="hbreak"></span><span class="seg"><button data-t="messages" class="${tab==='messages'?'on':''}">${esc(t('chat'))}</button><button data-t="screen" class="${tab==='screen'?'on':''}">${esc(t('screen'))}</button></span>
       <span style="flex:1"></span>
       ${run?'':s.status==='elsewhere'?`<button data-a="takeover">${esc(t('takeover'))}</button>`:`<button class="pri" data-a="start">${esc(t('startB'))}</button>`}
       <button class="rpTog" title="${esc(t('files_t'))}">☰</button>
@@ -630,7 +646,7 @@ async function showSession(name){
       try{await api('/api/session-rename',{old:name,new:nn.trim()});showSession(nn.trim())}catch(e){if(e)alertBar(e.message)}};
     $('#sHead').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;head();paint(true)});
     $('#sHead').querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{if(b.dataset.a==='stop'&&!confirmInline(b))return;
-      withBusy(b,async()=>{try{await api(`/api/session/${enc}/action`,{action:b.dataset.a});alertBar(t('sentA',b.dataset.a))}
+      withBusy(b,async()=>{try{await api(`/api/session/${enc}/action`,{action:b.dataset.a});alertBar(t('sentA',b.dataset.a),true)}
         catch(e){if(e)alertBar(e.message)}setTimeout(head,1500)})});};
   const paint=(force)=>{if(cur!==name)return;const atBottom=nearBottom();
     if(tab==='messages'){
@@ -644,6 +660,7 @@ async function showSession(name){
     try{const r=await api(`/api/session/${enc}/watch?v=${encodeURIComponent(ver)}&n=60${tab==='screen'?'&screen=1':''}`);
       if(cur!==name||showSession.gen!==gen)break;
       if(r.messages)msgs=r.messages;live=r.live||'';if(r.screen!=null)screen=r.screen;
+      if(!!r.menu!==askNow){askNow=!!r.menu;head().catch(()=>{})}   // waiting on a menu answer → header says so at once
       renderMenu($('#sMenu'),r.menu,(n,text)=>api(`/api/session/${enc}/choose`,{n,text}),ks=>api(`/api/session/${enc}/keys`,{keys:ks}));
       const first=!ver;ver=r.v;paint(first);
       if(r.busy||r.menu||tab==="screen")await new Promise(ok=>setTimeout(ok,1200));   // busy or screen tab → ~1.2 s refresh
@@ -741,7 +758,7 @@ async function rpTree(c,k,fresh){const B=$('#rpBody');if(!B)return;const rel=rp.
   B.querySelectorAll('[data-dir]').forEach(a=>a.onclick=e=>{e.preventDefault();go(a.dataset.dir)});
   B.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{rp.flt=b.dataset.f;rp.sig='';rpDraw(true)});
 }
-function alertBar(m){const d=document.createElement('div');d.className='card';d.style.color='var(--err)';d.textContent=m;app.prepend(d);setTimeout(()=>d.remove(),5000)}
+function alertBar(m,ok){const d=document.createElement('div');d.className='card';d.style.color=ok?'var(--ok)':'var(--err)';if(ok)d.style.borderColor='var(--ok)';d.textContent=m;app.prepend(d);setTimeout(()=>d.remove(),5000)}
 // quick bar: special keys + slash commands → then show the screen (menus/pickers render there)
 let redraw=null;
 document.querySelectorAll('#quick [data-k]').forEach(b=>b.onclick=()=>{if(!cur)return;
@@ -784,7 +801,7 @@ function wireAccPick(root,curAcc,busy,run,done){
   const sel=root.querySelector('.accSel'),go=root.querySelector('.accGo');if(!sel)return;
   sel.onchange=()=>{go.hidden=sel.value===curAcc};
   go.onclick=()=>{if(busy&&!confirmInline(go,t('switch_busy')))return;     // busy: the current turn gets cut off
-    withBusy(go,async()=>{try{await run(sel.value);alertBar(t('switching',sel.value));done&&done()}catch(e){if(e)alertBar(e.message)}},'…')}}
+    withBusy(go,async()=>{try{const r=await run(sel.value);alertBar(t(r&&r.done?'switched':'switching',sel.value),true);done&&done()}catch(e){if(e)alertBar(e.message)}},'…')}}
 // ＋ Commands: tools + slash commands in one popup next to the keys
 $('#btnMore').onclick=e=>{e.stopPropagation();$('#cmdMenu').hidden=!$('#cmdMenu').hidden};
 $('#cmdMenu').addEventListener('click',e=>{if(e.target.closest('button'))$('#cmdMenu').hidden=true});

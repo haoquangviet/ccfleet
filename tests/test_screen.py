@@ -90,6 +90,16 @@ class MenuParsing(unittest.TestCase):
         self.assertEqual([o["n"] for o in menu["options"]], [1, 2, 3])
         self.assertEqual(menu["current"], 1)
 
+    def test_question_header_kept_apart(self):
+        # AskUserQuestion: header chip, blank line, (wrapped) question — never "Rate limit Where should…"
+        frame = (" ☐ Rate limit\n\nWhere should the\nlimiter live?\n\n❯ 1. Middleware\n  2. Decorator\n"
+                 "  3. Type something.\n\nEnter to select · Esc to cancel\n")
+        menu = fleet_web.parse_choices(frame)
+        self.assertEqual(menu["header"], "Rate limit")
+        self.assertEqual(menu["question"], "Where should the limiter live?")
+        self.assertEqual(fleet_web.parse_choices(MENU_FRAME)["question"], "Which approach do you want?")
+        self.assertEqual(fleet_web.parse_choices(MENU_FRAME)["header"], "")
+
     def test_no_menu_while_busy(self):
         # even if menu-looking lines exist, a busy buffer must not surface a menu
         self.assertIsNone(fleet_web.menu_if_idle(MENU_DURING_SPINNER))

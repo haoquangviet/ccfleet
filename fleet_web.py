@@ -116,6 +116,7 @@ def state_payload() -> dict:
             "enabled": s.get("enabled", True), "stopped": bool(st.get("stopped")),
             "status": "running" if alive else ("elsewhere" if st.get("external_pid") else "down"),
             "busy": bool(alive and st.get("busy")),
+            "asking": bool(alive and not st.get("busy") and st.get("asking")),  # a menu waits for an answer
             "limit": bool(st.get("limit_hit")), "remote_url": st.get("remote_url"),
             "session_id": st.get("session_id") or s.get("session_id"),
             "up_min": int((time.time() - st.get("started_at", time.time())) / 60) if alive else None,
@@ -178,8 +179,9 @@ _MENU_HINTS = ("enter to select", "enter to confirm", "esc to cancel", "to navig
 def parse_choices(screen: str) -> dict | None:
     """Detect an interactive menu at the bottom of the TUI (AskUserQuestion, permission prompt,
     /model, /resume pickers…). Returns {options:[{n,label,free}], current, question, scroll} or None."""
-    lines = [x for x in screen.splitlines() if x.strip()]
-    tail = lines[-22:]
+    raw = screen.splitlines()
+    idx = [i for i, x in enumerate(raw) if x.strip()][-22:]  # raw line numbers of the non-blank tail
+    tail = [raw[i] for i in idx]
     low = "\n".join(tail).lower()
     if not any(h in low for h in _MENU_HINTS):
         return None
@@ -199,12 +201,37 @@ def parse_choices(screen: str) -> dict | None:
                      "free": bool(re.search(r"type something|other|something else", label, re.I))})
     if len(opts) < 2:
         return None
-    question = " ".join(x.strip(" │") for x in tail[max(0, first_idx - 3):first_idx]).strip()[:300]
+    header, question = _menu_title(raw[idx[max(0, first_idx - 3)]:idx[first_idx]])
     # Claude Code paints long pickers in a small scrolling viewport (~3 rows with ↑/↓ markers) no
     # matter how tall the console is, so the UI offers arrow buttons to scroll the menu itself.
     block = "\n".join(tail[first_idx:first_idx + len(opts) + 1])
-    return {"options": opts, "current": current or opts[0]["n"], "question": question,
+    return {"options": opts, "current": current or opts[0]["n"], "question": question, "header": header,
             "scroll": "↓" in block or "↑" in block}
+
+
+def _menu_title(lines: list[str]) -> tuple[str, str]:
+    """The text above a menu → (header, question). AskUserQuestion draws a short header chip
+    ("☐ Rate limit"), a blank line, then the question; the blank line is what tells them apart, so
+    they never run together as "Rate limit Where should…". Wrapped question lines are re-joined."""
+    blocks, curb = [], []
+    for x in lines:
+        x = x.strip(" │")
+        if x:
+            curb.append(x)
+        elif curb:
+            blocks.append(curb)
+            curb = []
+    if curb:
+        blocks.append(curb)
+    if not blocks:
+        return "", ""
+    question = " ".join(blocks[-1])[:300]
+    header = ""
+    if len(blocks) > 1 and len(blocks[-2]) == 1:
+        h = blocks[-2][0].lstrip("☐☒✔✓□■←→ ").strip()
+        if len(h) <= 40:
+            header = h
+    return header, question
 
 
 def menu_if_idle(screen: str) -> dict | None:
@@ -696,7 +723,10 @@ class Handler(BaseHTTPRequestHandler):
                     except ValueError as e:
                         return self._json(400, {"error": str(e)})
                     audit(self.ip, f"{act} {name}" + (f" account={body.get('account')}" if body.get("account") else ""))
-                    return self._json(200, {"ok": True})
+                    # done = already running again (demo); otherwise the supervisor relaunches it next tick
+                    st2 = ccfleet.load_json(ccfleet.STATE, {}).get(name, {})
+                    done = act != "stop" and not st2.get("force_start") and ccfleet.pid_alive(st2.get("pid"))
+                    return self._json(200, {"ok": True, "done": bool(done)})
         except KeyError:
             return self._json(404, {"error": "not found"})
         return self._json(404, {"error": "not found"})
