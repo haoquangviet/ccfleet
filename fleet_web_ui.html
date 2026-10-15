@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ccfleet</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#1d2330;--mut:#6b7280;--bd:#e3e6eb;--pri:#174785;--ok:#348D00;--warn:#d48806;--err:#ED542C;--code:#0f172a;--codefg:#e2e8f0}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#171a21;--fg:#e6e8ee;--mut:#9aa3b2;--bd:#262b36;--pri:#6ea0ff;--code:#0b0d12}}
+*{box-sizing:border-box}body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--fg)}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top));background:var(--card);border-bottom:1px solid var(--bd)}
+header b{font-size:17px}header .sp{flex:1}
+main{max-width:980px;margin:0 auto;padding:12px 14px calc(150px + env(safe-area-inset-bottom))}
+/* two-pane shell: sidebar (sessions) + detail. Single column on phones, side-by-side >=900px. */
+#shell{display:block}
+#side{display:none}
+#detail{min-width:0}
+@media (min-width:900px){
+  main{max-width:1320px}
+  #shell{display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start}
+  #side{display:block;position:sticky;top:64px;max-height:calc(100vh - 80px);overflow-y:auto;padding-right:2px}
+  #side.hide-desktop{display:none}            /* only login / setup hide the fixed panel */
+  .composer .row{max-width:1320px;padding-left:338px}  /* align composer under the right pane */
+}
+/* --- Sidebar: darker surface, thin outline icon nav, compact session list --- */
+#side{font-size:14px;color:var(--fg);--rail-hover:color-mix(in srgb,var(--fg) 9%,transparent)}
+.rail{display:flex;flex-direction:column;gap:1px}
+.rail .seclabel{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);margin:16px 10px 6px}
+.rail .seclabel .sp{flex:1}
+.navitem{display:flex;align-items:center;gap:12px;padding:7px 10px;border-radius:8px;cursor:pointer;color:var(--fg);border:0;background:none;width:100%;text-align:left;font:inherit;font-size:14px}
+.navitem:hover{background:var(--rail-hover)}
+.navitem .ic{width:17px;height:17px;display:inline-flex;align-items:center;justify-content:center;flex:none;color:var(--mut)}
+.navitem .ic svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.6}
+.sitem{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;cursor:pointer;min-height:32px}
+.sitem:hover{background:var(--rail-hover)}
+.sitem.sel{background:var(--rail-hover)}
+.sitem .dot{width:7px;height:7px;flex:none}
+.sitem .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sitem .when{font-size:12px;color:var(--mut);white-space:nowrap}
+.sitem.sel .nm{font-weight:600}
+.sitem.dim .nm{color:var(--mut)}
+.sitem .mach{font-size:10.5px;color:var(--mut);border:1px solid var(--bd);border-radius:999px;padding:0 6px;flex:none}
+.railfoot{margin-top:14px;padding-top:10px;border-top:1px solid var(--bd);display:grid;gap:7px}
+.acctrow{display:flex;align-items:center;gap:6px;font-size:12px}
+.acctrow b{min-width:44px}
+@media (max-width:899px){#side .rail{gap:2px}.navitem,.sitem{padding:9px 12px}}
+button{font:inherit;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:8px;padding:7px 12px;cursor:pointer}
+button.pri{background:var(--pri);border-color:var(--pri);color:#fff}button.dan{color:var(--err)}
+input,textarea{font:inherit;width:100%;padding:9px 11px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--fg)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:10px}
+/* session controls stay in view while the chat scrolls */
+#sHead{position:sticky;top:var(--hh,56px);z-index:4;box-shadow:0 4px 10px rgba(0,0,0,.12)}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.mut{color:var(--mut);font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--mut)}
+.dot.running{background:var(--ok)}.dot.busy{background:var(--warn)}.dot.down{background:var(--err)}
+.tag{font-size:12px;border:1px solid var(--bd);border-radius:999px;padding:1px 8px}.tag.lim{color:var(--err);border-color:var(--err)}
+.tag.demo{color:var(--warn);border-color:var(--warn)}
+.tabs{display:flex;gap:6px;margin:6px 0 10px}.tabs button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.msg{padding:8px 10px;border-radius:10px;margin:6px 0;white-space:pre-wrap;word-break:break-word}
+.msg.user{background:color-mix(in srgb,var(--pri) 12%,transparent);margin-left:12%}
+.msg.assistant{background:var(--card);border:1px solid var(--bd);margin-right:6%}
+.msg.tool{font-size:12px;color:var(--mut);padding:2px 10px}
+pre.screen{background:var(--code);color:var(--codefg);padding:10px;border-radius:10px;overflow-x:auto;font:12px/1.35 ui-monospace,Consolas,monospace;white-space:pre}
+.composer{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--bd);padding:8px 12px calc(8px + env(safe-area-inset-bottom))}
+#quick{flex-wrap:wrap;gap:6px;margin:0 auto 6px;max-width:980px;position:relative}
+#quick button{padding:5px 10px;font-size:13px;white-space:nowrap;flex:none}
+#btnMore{margin-left:auto}
+#cmdMenu{position:absolute;right:0;bottom:calc(100% + 6px);z-index:20;background:var(--card);border:1px solid var(--bd);border-radius:10px;
+  box-shadow:0 6px 24px rgba(0,0,0,.18);padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px;width:min(440px,calc(100vw - 24px));max-height:60vh;overflow:auto}
+#cmdMenu[hidden]{display:none}#cmdMenu .mut{grid-column:1/-1;font-size:12px;margin-top:2px}
+#cmdMenu button{text-align:left;white-space:normal!important}#cmdMenu button .mut{display:block;font-size:11px}
+.composer .row{max-width:980px;margin:0 auto;flex-wrap:nowrap}.composer textarea{min-height:42px;max-height:160px;resize:vertical}
+.bar{height:6px;border-radius:3px;background:var(--bd);overflow:hidden;min-width:80px;flex:1}.bar i{display:block;height:100%;background:var(--ok)}
+.login{max-width:360px;margin:12vh auto}.login .card>*{margin-bottom:10px}
+a{color:var(--pri)}
+/* 3 panes: rail | session | files. The right pane only exists on a session view. */
+#rpane{display:none;font-size:14px}
+@media (min-width:1280px){
+  #shell.three{grid-template-columns:280px minmax(0,1fr) 340px}
+  #shell.three #rpane{display:block;position:sticky;top:64px;max-height:calc(100vh - 80px);overflow-y:auto}
+  main.three{max-width:1700px}
+  .composer.three .row{max-width:1700px;padding-left:298px;padding-right:358px}
+  .rpTog{display:none}
+}
+@media (max-width:1279px){#rpane.open{display:block;position:fixed;right:0;top:var(--hh,56px);bottom:0;width:min(380px,94vw);z-index:30;
+  background:var(--bg);border-left:1px solid var(--bd);overflow-y:auto;padding:10px;box-shadow:-6px 0 20px rgba(0,0,0,.25)}}
+#sHead{padding:8px 10px}
+.hrow{flex-wrap:nowrap}.hrow>b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:40px;max-width:32%}
+.hrow .accSel{max-width:120px}
+.seg{display:inline-flex;flex:none}.seg button{border-radius:0;padding:5px 10px}.seg button:first-child{border-radius:8px 0 0 8px}
+.seg button+button{border-left:0}.seg button:last-child{border-radius:0 8px 8px 0}.seg button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.dd{position:relative;flex:none}.ddm{position:absolute;right:0;top:calc(100% + 4px);z-index:25;background:var(--card);border:1px solid var(--bd);border-radius:10px;
+  box-shadow:0 6px 24px rgba(0,0,0,.18);padding:6px;display:grid;gap:4px;min-width:200px}
+.ddm[hidden]{display:none}.ddm>button,.ddm>a{text-align:left;width:100%;display:block;padding:7px 10px;border-radius:8px;border:1px solid var(--bd);text-decoration:none;color:var(--fg)}
+.rtabs{display:flex;gap:6px;margin-bottom:8px;align-items:center}.rtabs button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.ritem{border:1px solid var(--bd);border-radius:8px;padding:8px;margin-bottom:6px;background:var(--card);font-size:13px;overflow-wrap:anywhere}
+.ritem img,.ritem video{max-width:100%;max-height:220px;border-radius:6px;display:block;margin-bottom:4px}
+.ritem audio{width:100%}.ritem button{padding:3px 8px;font-size:12px}
+.msg.pend{opacity:.8;border:1px dashed var(--bd)}.msg .q{font-size:12px;color:var(--warn)}
+/* ---- app shell — desktop only; phones keep the page scroll ---- */
+select{font:inherit;color:var(--fg);background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 9px center;
+  border:1px solid var(--bd);border-radius:8px;padding:6px 28px 6px 10px;appearance:none;-webkit-appearance:none;cursor:pointer;width:auto;max-width:100%}
+select:hover{border-color:color-mix(in srgb,var(--fg) 25%,var(--bd))}select:focus{outline:2px solid color-mix(in srgb,var(--pri) 40%,transparent);outline-offset:1px}
+.hrow select.accSel{padding:4px 26px 4px 9px;font-size:13px}
+@media (min-width:900px){
+  html,body{height:100%;overflow:hidden}
+  main,main.three{max-width:none;margin:0;padding:0;height:calc(100dvh - var(--hh,56px))}
+  #shell{height:100%;gap:0;grid-template-columns:280px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;align-items:stretch}
+  #shell.three{grid-template-columns:280px minmax(0,1fr) 340px}
+  #side{grid-row:1/3;grid-column:1;position:static;top:auto;max-height:none;height:100%;overflow-y:auto;padding:8px 8px 16px;
+    background:color-mix(in srgb,var(--fg) 3%,var(--bg));border-right:1px solid var(--bd)}
+  #app{grid-row:1;grid-column:2;overflow-y:auto;min-height:0;padding:0 24px 16px}
+  #shell.solo #app{grid-column:1/-1}
+  #app>.card:not(#sHead),#sBody,#sPend,#sLive,#sMenu{max-width:900px;margin-left:auto;margin-right:auto}
+  #sHead{top:0;margin:0 -24px 12px;border-radius:0;border-width:0 0 1px;box-shadow:none;padding:8px 24px;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(6px)}
+  .composer{grid-row:2;grid-column:2;position:static;border-top:0;background:transparent;padding:4px 24px 14px}
+  .composer .row,.composer.three .row{max-width:900px;padding:0;margin:0 auto}
+  .composer #quick{max-width:900px;flex-wrap:nowrap;gap:4px;margin-bottom:6px}
+  .composer #quick button{padding:3px 9px;font-size:12.5px}
+  .composer .row:last-child{border:1px solid var(--bd);border-radius:14px;background:var(--card);padding:6px;gap:6px;align-items:flex-end;
+    box-shadow:0 2px 10px rgba(0,0,0,.06)}
+  .composer textarea{border:0;outline:0;background:transparent;resize:none;min-height:46px}
+  #shell.solo{display:block;height:100%;overflow-y:auto}
+}
+@media (min-width:900px) and (max-width:1279px){#shell.three{grid-template-columns:280px minmax(0,1fr)}}
+@media (min-width:1280px){
+  #shell.three #rpane{grid-row:1/3;grid-column:3;position:static;top:auto;max-height:none;height:100%;overflow-y:auto;padding:10px 12px;
+    background:color-mix(in srgb,var(--fg) 3%,var(--bg));border-left:1px solid var(--bd)}
+}
+/* desktop has no top bar: brand sits at the top of the rail, ‹ in the session bar */
+select{padding-right:28px!important}
+.brand{display:flex;align-items:center;gap:8px;padding:6px 10px 10px}.brand b{font-size:17px}.brand .mut{font-size:12px}
+.hBack{padding:3px 9px;font-size:15px;line-height:1}
+@media (max-width:899px){.brand{display:none}.hBack{display:none}}
+@media (min-width:900px){header{display:none}}
+</style>
+</head>
+<body>
+<header><b>ccfleet</b><span id="demoTag"></span><span id="sup" class="mut"></span><span class="sp"></span>
+  <button id="btnBack" hidden data-i="sessions">‹ Sessions</button></header>
+<main><div id="shell"><aside id="side"></aside><section id="app"></section><div class="composer" id="composer" hidden>
+ <div class="row" id="quick">
+  <button data-k="esc" data-it="k_esc">Esc</button><button data-k="up">↑</button><button data-k="down">↓</button><button data-k="left" data-it="k_left">←</button><button data-k="right" data-it="k_right">→</button><button data-k="enter">Enter</button>
+  <button data-k="shift+tab" data-it="k_stab">⇧Tab</button><button data-k="tab">Tab</button><button data-k="ctrl+c">Ctrl+C</button>
+  <button id="btnMore" data-i="more" data-it="more_t"></button>
+  <div id="cmdMenu" hidden>
+   <div class="mut" data-i="tools"></div>
+   <button id="btnAttach" data-i="attach" data-it="attach_t"></button><input type="file" id="attFile" multiple hidden>
+   <button id="btnRewrite" data-i="rewrite" data-it="rewrite_t"></button>
+   <div class="mut" data-i="cc_cmds"></div>
+   <button data-c="/compact">/compact <span class="mut" data-i="c_compact"></span></button><button data-c="/context">/context <span class="mut" data-i="c_context"></span></button>
+   <button data-c="/model">/model <span class="mut" data-i="c_model"></span></button><button data-c="/cost">/usage <span class="mut" data-i="c_usage"></span></button>
+   <button data-c="/resume">/resume <span class="mut" data-i="c_resume"></span></button><button data-c="/agents">/agents <span class="mut" data-i="c_agents"></span></button>
+   <button data-c="/mcp">/mcp <span class="mut" data-i="c_mcp"></span></button><button data-c="/status">/status <span class="mut" data-i="c_status"></span></button>
+   <button data-c="/clear">/clear <span class="mut" data-i="c_clear"></span></button>
+  </div></div>
+ <div class="row">
+  <textarea id="txt" data-ip="txt_ph"></textarea><button id="btnUndo" data-it="undo_t" hidden>↩</button><button class="pri" id="btnSend" data-i="send"></button></div></div><aside id="rpane"></aside></div></main>
+
+<script>
+// ---- i18n: every UI string lives here. English is the default and the fallback for missing keys.
+const I18N={
+en:{
+  sessions:'Sessions',k_esc:'Interrupt (Esc)',k_left:'Left (multi-tab menus)',k_right:'Right',k_stab:'Cycle permission mode',
+  more:'＋ Commands',more_t:'Commands & tools',tools:'Tools',attach:'📎 Upload file',attach_t:'Upload files to the project and insert their paths',
+  rewrite:'✨ Rewrite prompt',rewrite_t:'Rewrite the draft prompt more clearly (Haiku)',cc_cmds:'Claude Code commands',
+  c_compact:'compact context',c_context:'context usage',c_model:'switch model',c_usage:'usage limits',c_resume:'resume a session',
+  c_agents:'subagents',c_mcp:'MCP servers',c_status:'status',c_clear:'clear conversation',
+  txt_ph:'Send a prompt to this session… (Ctrl+Enter · paste images with Ctrl+V)',undo_t:'Restore the original before rewrite',send:'Send',
+  home:'Home',projects:'Projects',project:'Project',up:'Up',session_n:'Session {0}',skills:'Skills',
+  demo_tag:'Demo mode — fake data',demo_t:'Fake sessions and transcripts — nothing is sent to Claude',demo_short:'demo',lang_t:'Language',
+  login_title:'Sign in to ccfleet',login_hint:'Not set up yet — on this machine run <code>ccfleet web open</code> (instant login link) or <code>ccfleet web setup</code> (set password + TOTP).',
+  pw:'Password',otp:'6-digit code',signin:'Sign in',setup_title:'Set up ccfleet web',
+  setup_hint:'Choose a password (12+ characters), then add the key to your authenticator app (Google Authenticator, 1Password…).',
+  new_pw:'New password',cont:'Continue',open_auth:'Open authenticator app',or_key:'or enter the key:',otp_app:'6-digit code from the app',confirm:'Confirm',
+  sup_on:'supervisor',sup_off:'supervisor off',nav_new:'New project',nav_proj:'Projects',nav_skills:'Skills',
+  st_stopped:'stopped',st_working:'working',st_idle:'idle',st_elsewhere:'elsewhere',st_off:'off',minutes:'{0}m',
+  acct_t:'Claude account',limit_t:'usage limit reached',no_sessions:'No sessions yet',no_accounts:'No accounts yet',
+  add_acc:'Add account',signout:'Sign out',signout2:'Click again to sign out',pick:'Pick a session on the left, or create a new project.',
+  acc_title:'Add a Claude account',acc_hint:'1) Pick a name (e.g. work) → 2) open the link and sign in with that Claude account → 3) paste the code it shows here.',
+  acc_name:'Account name (lowercase, digits, -)',start:'Start',acc_open:'Open the Claude sign-in page',acc_code:'Paste the authorization code',
+  cancel:'Cancel',confirming:'Confirming…',acc_added:'Added',failed:'Failed',acc_wait:'Getting the sign-in link…',not_signed:'(not signed in)',
+  np_title:'New project',np_name:'Session name (e.g. my-app)',np_path:'Folder (e.g. C:\\Projects\\my-app)',
+  np_clone:'Git URL to clone (empty = new folder + git init)',np_prompt:'Opening prompt for the session (optional)',np_go:'Create and start',creating:'Creating…',
+  sk_title:'Shared skills',sk_count:'{0} skills',sk_refresh:'Refresh library',sk_pick:'— Pick a project —',sk_filter:'Filter skills…',sk_save:'Save ({0})',
+  sk_native:"Project's own skills (left untouched): ",sk_own:'own',
+  f_root:'root',f_upload:'⬆ Upload',f_newdir:'New folder name',f_mk:'+ Folder',f_sendto:'Send to session:',f_note:'Note to include (e.g. fix the bug in this screenshot)',
+  f_nosess:'No ccfleet session for this project yet — open one from "Projects" to send file paths.',del:'Delete',sure:'Sure?',empty:'Empty folder',sent:'✓ Sent',
+  att_need:'📎 Open a session first',att_fail:'📎 Upload failed: ',m_asking:'Claude is asking',m_scroll:'scroll to see more options',
+  pr_title:'Projects (from Claude Code history)',pr_n:'{0} sessions',pr_none:'No Claude Code history found yet.',
+  p_files:'📁 Files',p_new:'+ New session',p_recent:'{0} recent sessions · "Reopen" continues the exact conversation',managed:'Managed as: {0}',reopen:'Reopen',untitled:'(untitled)',
+  back:'Back',s_working:'working…',s_idle:'idle',s_else:'open elsewhere',s_off:'off',chat:'Chat',screen:'Screen',takeover:'Takeover',startB:'Start',
+  files_t:'Session files',rename:'✎ Rename',restart:'↻ Restart',stop:'■ Stop',projfiles:'📁 Project files',open_ai:'↗ Open on claude.ai',
+  newname:'New session name:',sentA:'Sent: {0}',no_msgs:'No messages yet',responding:'● responding…',stop2:'Click again to stop',
+  queued:'⏳ queued — the session picks it up after the current turn',
+  sending:'sending…',send_err:'✕ send failed: ',typed:'✓ typed into the session — waiting for it to show in the chat',
+  notyet:'⚠ not in the chat yet (if the session is busy it is still queued)',resend:'Resend',dismiss:'Dismiss',conn_lost:'connection lost',
+  upl_wait:'Image upload in progress — send when it finishes',sendingB:'Sending…',more_actions:'More actions',rp_files:'📎 Files',close:'Close',loading:'Loading…',
+  via_write:'Claude wrote',via_bash:'Claude used',via_text:'Claude mentioned',via_user:'You sent',
+  f_all:'All',f_media:'Media',f_user:'Sent by you',f_tree:'📁 Project',open:'Open',download:'Download',
+  rp_none:"No files found in this project's conversations yet — see 📁 Project.",error:'error',
+  clear_q:'Clear context?',rw_need:'Type a prompt first, then click ✨ Rewrite',up_img:'uploading image {0} KB…',paste_fail:'Image paste failed: ',
+  acc_sel_t:'Claude account for this session',switch:'Switch account',switch_t:'Copy the conversation to this account, close the running copy and reopen it (--resume)',
+  switch_busy:'Working — click again to interrupt & switch',switching:'Switching to {0}…',
+  pro:'ccfleet Pro: multi-machine, share links, MCP, task queue →',contact:'Contact'
+},
+vi:{
+  sessions:'Phiên',k_esc:'Dừng (Esc)',k_left:'Sang trái (menu nhiều nhóm)',k_right:'Sang phải',k_stab:'Đổi chế độ quyền',
+  more:'＋ Lệnh',more_t:'Lệnh & tính năng',tools:'Tính năng',attach:'📎 Tải file lên',attach_t:'Tải file lên dự án và chèn đường dẫn',
+  rewrite:'✨ Viết lại prompt',rewrite_t:'Viết lại prompt đang soạn cho rõ ràng (Haiku)',cc_cmds:'Lệnh Claude Code',
+  c_compact:'thu gọn ngữ cảnh',c_context:'ngữ cảnh đã dùng',c_model:'đổi model',c_usage:'hạn mức',c_resume:'mở phiên cũ',
+  c_agents:'subagent',c_mcp:'MCP server',c_status:'trạng thái',c_clear:'xoá hội thoại',
+  txt_ph:'Gửi lệnh cho phiên… (Ctrl+Enter · dán ảnh Ctrl+V)',undo_t:'Trả lại bản gốc trước khi viết lại',send:'Gửi',
+  home:'Trang chủ',projects:'Dự án',project:'Dự án',up:'Thư mục trên',session_n:'Phiên {0}',skills:'Skills',
+  demo_tag:'Chế độ demo — dữ liệu giả',demo_t:'Phiên và hội thoại giả — không gửi gì tới Claude',demo_short:'demo',lang_t:'Ngôn ngữ',
+  login_title:'Đăng nhập ccfleet',login_hint:'Chưa thiết lập — trên máy này chạy <code>ccfleet web open</code> (vào ngay) hoặc <code>ccfleet web setup</code> (đặt mật khẩu + OTP).',
+  pw:'Mật khẩu',otp:'Mã OTP 6 số',signin:'Đăng nhập',setup_title:'Thiết lập ccfleet web',
+  setup_hint:'Đặt mật khẩu (≥12 ký tự), rồi thêm mã vào app xác thực (Google Authenticator…).',
+  new_pw:'Mật khẩu mới',cont:'Tiếp tục',open_auth:'Mở app xác thực',or_key:'hoặc nhập khoá:',otp_app:'Nhập mã 6 số từ app',confirm:'Xác nhận',
+  sup_on:'supervisor',sup_off:'supervisor tắt',nav_new:'Tạo dự án',nav_proj:'Dự án',nav_skills:'Skills',
+  st_stopped:'đã dừng',st_working:'đang làm',st_idle:'rảnh',st_elsewhere:'nơi khác',st_off:'tắt',minutes:'{0}p',
+  acct_t:'Tài khoản Claude',limit_t:'hết hạn mức',no_sessions:'Chưa có phiên',no_accounts:'Chưa có tài khoản',
+  add_acc:'Thêm tài khoản',signout:'Thoát',signout2:'Bấm lần nữa để thoát',pick:'Chọn một phiên bên trái để xem chi tiết, hoặc tạo dự án mới.',
+  acc_title:'Thêm tài khoản Claude',acc_hint:'1) Đặt tên (vd: work) → 2) mở link, đăng nhập đúng tài khoản Claude → 3) dán mã hiện ra vào đây.',
+  acc_name:'Tên tài khoản (chữ thường, số, -)',start:'Bắt đầu',acc_open:'Mở trang đăng nhập Claude',acc_code:'Dán mã xác nhận',
+  cancel:'Huỷ',confirming:'Đang xác nhận…',acc_added:'Đã thêm',failed:'Thất bại',acc_wait:'Đang lấy link đăng nhập…',not_signed:'(chưa đăng nhập)',
+  np_title:'Tạo dự án',np_name:'Tên phiên (vd: my-app)',np_path:'Thư mục (vd: C:\\Projects\\my-app)',
+  np_clone:'Git URL để clone (bỏ trống = thư mục mới + git init)',np_prompt:'Yêu cầu mở đầu cho phiên (tuỳ chọn)',np_go:'Tạo và chạy',creating:'Đang tạo…',
+  sk_title:'Skills dùng chung',sk_count:'{0} skill',sk_refresh:'Cập nhật thư viện',sk_pick:'— Chọn dự án —',sk_filter:'Lọc skill…',sk_save:'Lưu ({0})',
+  sk_native:'Skill gốc của dự án (không đổi): ',sk_own:'gốc',
+  f_root:'gốc',f_upload:'⬆ Tải lên',f_newdir:'Tên thư mục mới',f_mk:'+ Thư mục',f_sendto:'Gửi cho phiên:',f_note:'Ghi chú kèm (vd: sửa lỗi trong ảnh này)',
+  f_nosess:'Dự án chưa có phiên ccfleet — mở phiên trong "Dự án" để gửi đường dẫn.',del:'Xoá',sure:'Chắc chưa?',empty:'Thư mục trống',sent:'✓ Đã gửi',
+  att_need:'📎 Mở một phiên trước',att_fail:'📎 Tải lên lỗi: ',m_asking:'Claude đang hỏi',m_scroll:'cuộn để xem các mục khác',
+  pr_title:'Dự án (từ lịch sử Claude Code)',pr_n:'{0} phiên',pr_none:'Chưa thấy lịch sử Claude Code.',
+  p_files:'📁 Tệp',p_new:'+ Phiên mới',p_recent:'{0} phiên gần nhất · bấm "Mở lại" để tiếp tục đúng hội thoại',managed:'Đang quản lý: {0}',reopen:'Mở lại',untitled:'(không có tiêu đề)',
+  back:'Quay lại',s_working:'đang làm…',s_idle:'rảnh',s_else:'mở nơi khác',s_off:'tắt',chat:'Hội thoại',screen:'Màn hình',takeover:'Tiếp quản',startB:'Chạy',
+  files_t:'Tệp của phiên',rename:'✎ Đổi tên',restart:'↻ Khởi động lại',stop:'■ Dừng',projfiles:'📁 Tệp dự án',open_ai:'↗ Mở trên claude.ai',
+  newname:'Tên mới cho phiên:',sentA:'Đã gửi: {0}',no_msgs:'Chưa có nội dung',responding:'● đang trả lời…',stop2:'Bấm lần nữa để dừng',
+  queued:'⏳ đang xếp hàng — phiên nhận khi xong lượt',
+  sending:'đang gửi…',send_err:'✕ gửi lỗi: ',typed:'✓ đã gõ vào phiên — chờ hiện trong hội thoại',
+  notyet:'⚠ chưa thấy trong hội thoại (phiên bận thì vẫn đang xếp hàng)',resend:'Gửi lại',dismiss:'Bỏ',conn_lost:'mất kết nối',
+  upl_wait:'Đang tải ảnh lên — chờ xong rồi gửi',sendingB:'Đang gửi…',more_actions:'Thêm thao tác',rp_files:'📎 Tệp',close:'Đóng',loading:'Đang tải…',
+  via_write:'Claude ghi',via_bash:'Claude dùng',via_text:'Claude nhắc',via_user:'Bạn gửi',
+  f_all:'Tất cả',f_media:'Ảnh/Video',f_user:'Bạn gửi',f_tree:'📁 Dự án',open:'Mở',download:'Tải',
+  rp_none:'Chưa thấy tệp nào trong các hội thoại của dự án — xem 📁 Dự án.',error:'lỗi',
+  clear_q:'Xoá ngữ cảnh?',rw_need:'Gõ prompt vào ô trước, rồi bấm ✨ Viết lại',up_img:'đang tải ảnh {0} KB…',paste_fail:'Dán ảnh lỗi: ',
+  acc_sel_t:'Tài khoản Claude của phiên',switch:'Chuyển & tiếp quản',switch_t:'Chép hội thoại sang tài khoản này, đóng bản đang chạy rồi mở lại (--resume)',
+  switch_busy:'Đang làm — bấm lần nữa để ngắt & chuyển',switching:'Đang chuyển sang {0}…',
+  pro:'ccfleet Pro: nhiều máy, link chia sẻ, MCP, hàng đợi task →',contact:'Liên hệ'
+}};
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const lsSet=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}};
+const navLang=()=>/^vi\b/i.test(navigator.language||'')?'vi':'en';
+let lang=(()=>{const s=lsGet('ccfleet.lang');return I18N[s]?s:navLang()})();
+function t(key,...args){const s=(I18N[lang]&&I18N[lang][key])??I18N.en[key]??key;return String(s).replace(/\{(\d+)\}/g,(m,i)=>args[i]??'')}
+const fmtDate=(t1,opt)=>new Date(t1*1000).toLocaleString(lang==='vi'?'vi-VN':undefined,opt);
+const when=t1=>fmtDate(t1,{dateStyle:'short',timeStyle:'short'});
+// static markup: data-i → text, data-it → title, data-ip → placeholder
+function applyStatic(){document.documentElement.lang=lang;
+  document.querySelectorAll('[data-i]').forEach(el=>{el.textContent=(el.id==='btnBack'?'‹ ':'')+t(el.dataset.i)});
+  document.querySelectorAll('[data-it]').forEach(el=>el.title=t(el.dataset.it));
+  document.querySelectorAll('[data-ip]').forEach(el=>el.placeholder=t(el.dataset.ip));
+  $('#demoTag').innerHTML=isDemo?`<span class="tag demo" title="${esc(t('demo_t'))}">${esc(t('demo_tag'))}</span>`:'';
+  updBack()}
+const langSeg=()=>`<span class="seg langSeg" title="${esc(t('lang_t'))}"><button data-lang="en" class="${lang==='en'?'on':''}">EN</button><button data-lang="vi" class="${lang==='vi'?'on':''}">VI</button></span>`;
+let onLogin=null;   // set while the login page is shown, so a language switch re-renders it
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-lang]');if(!b)return;
+  lang=b.dataset.lang;lsSet('ccfleet.lang',lang);applyStatic();
+  if(onLogin)showLogin(onLogin.configured);else route()});
+
+const $=s=>document.querySelector(s), app=$('#app'), side=$('#side');
+const isWide=()=>matchMedia('(min-width:900px)').matches;
+const scroller=()=>isWide()?$('#app'):null;
+const nearBottom=()=>{const a=scroller();return a?a.scrollTop+a.clientHeight>=a.scrollHeight-120:innerHeight+scrollY>=document.body.scrollHeight-120};
+const toBottom=()=>{const a=scroller();if(a)a.scrollTop=a.scrollHeight;else scrollTo(0,document.body.scrollHeight)};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(p,body){const r=await fetch(p,body?{method:'POST',headers:{'Content-Type':'application/json','X-Fleet':'1'},body:JSON.stringify(body)}:{});
+  const j=await r.json().catch(()=>({}));if(r.status===401&&p!=='/api/login'){showLogin();throw 0}if(!r.ok)throw new Error(j.error||r.status);return j}
+let cur=null, tab='messages', timer=null, isDemo=false;
+// background refresh: a failed round (e.g. while the supervisor restarts) just waits for the next one
+function setTimer(fn,ms){clearInterval(timer);timer=setInterval(()=>{Promise.resolve().then(fn).catch(()=>{})},ms)}
+
+// ---- routing: every view owns a hash so Back and F5 land where you were -------------------------
+let routing=false;   // set while a hashchange is being applied, so route() doesn't loop
+function setHash(parts){
+  if(routing)return;
+  const h='#'+parts.map(encodeURIComponent).join('/');
+  if(location.hash!==h){routing=true;location.hash=h;setTimeout(()=>routing=false,0)}
+  updBack();
+}
+async function route(){
+  const raw=location.hash.replace(/^#/,'');
+  if(/^(setup|login)=/.test(raw))return;                      // the one-time setup link keeps its own flow
+  const p=raw?raw.split('/').map(decodeURIComponent):[];
+  routing=true;
+  try{
+    switch(p[0]){
+      case 'session':  if(p[1]){tab=p[2]||tab;await showSession(p[1]);return} break;
+      case 'project':  if(p[1]){await showProject(p[1]);return} await showProjects();return;
+      case 'files':    if(p[1]){await showFiles(p[1],p[2]||'',p[3]||undefined);return} break;
+      case 'skills':   await showSkills(p[1]||undefined);return;
+      case 'new':      await showNew(Object.keys((lastState||{}).accounts||{main:1}));return;
+      case 'account':  showAddAccount();return;
+    }
+    await showList();
+  } finally { routing=false }
+}
+addEventListener('hashchange',()=>{route();updBack()});
+// header height → where the sticky session controls sit (it wraps on a phone)
+const setHH=()=>{const h=$('header');document.documentElement.style.setProperty('--hh',(h?h.offsetHeight:56)+'px')};  // 0 on desktop (header hidden)
+addEventListener('resize',setHH);addEventListener('load',setHH);setHH();
+// ‹ back = the parent of the current view, labelled with where it goes
+function backTarget(){
+  const p=location.hash.replace(/^#/,'').split('/').map(decodeURIComponent);   // keep empty parts: files/<p>//<session>
+  switch(p[0]){
+    case 'session': return [[],t('sessions')];
+    case 'project': return p[1]?[['project'],t('projects')]:[[],t('home')];
+    case 'files':   if(p[2]){const d=p[2].split('/').slice(0,-1).join('/');return [p[3]?['files',p[1],d,p[3]]:['files',p[1],d],t('up')]}
+                    return p[3]?[['session',p[3]],t('session_n',p[3])]:[['project',p[1]],t('project')];
+    case 'skills':  return p[1]?[['skills'],t('skills')]:[[],t('home')];
+    default:        return [[],t('home')];
+  }
+}
+function updBack(){ $('#btnBack').textContent='‹ '+backTarget()[1] }
+
+
+// ---- busy buttons: a click disables its button until the work finishes, so you can always tell
+// whether the command was actually sent ----------------------------------------------------------
+async function withBusy(btn,fn,label){
+  if(!btn)return fn();
+  if(btn.disabled)return;                      // already running — ignore double taps
+  const old=btn.textContent, w=btn.offsetWidth;
+  btn.disabled=true; btn.style.minWidth=w+'px'; btn.textContent=label||'…';
+  try{ return await fn() }
+  finally{ btn.disabled=false; btn.textContent=old; btn.style.minWidth='' }
+}
+
+async function boot(){
+  applyStatic();
+  const setup=(location.hash.match(/setup=([\w-]+)/)||[])[1];
+  if(setup) return showSetup(setup);
+  const link=(location.hash.match(/login=([\w-]+)/)||[])[1];   // `ccfleet web open` on this machine
+  if(link){history.replaceState(0,'','/');try{await api('/api/login-link',{token:link})}catch(e){}}
+  const me=await api('/api/me');
+  isDemo=!!me.demo;
+  // precedence: saved choice > server default (config) > browser language
+  if(!I18N[lsGet('ccfleet.lang')]&&I18N[me.lang])lang=me.lang;
+  applyStatic();
+  if(!me.authed) return showLogin(me.configured);
+  route();   // F5 lands back on whatever the hash points at
+}
+function showLogin(configured=true){
+  onLogin={configured};
+  clearInterval(timer);$('#composer').hidden=true;$('#btnBack').hidden=true;
+  rpaneHide();$('#shell').classList.add('solo');side.classList.add('hide-desktop');side.innerHTML='';
+  app.innerHTML=`<div class="login"><div class="card"><div class="row"><b style="flex:1">${esc(t('login_title'))}</b>${langSeg()}</div>
+   ${configured?'':`<div class="mut">${t('login_hint')}</div>`}
+   <input id="pw" type="password" placeholder="${esc(t('pw'))}" autocomplete="current-password">
+   <input id="otp" inputmode="numeric" autocomplete="one-time-code" placeholder="${esc(t('otp'))}">
+   <button class="pri" id="go" style="width:100%">${esc(t('signin'))}</button><div id="err" class="mut"></div></div></div>`;
+  const go=async()=>{try{await api('/api/login',{password:$('#pw').value,otp:$('#otp').value});onLogin=null;showList()}catch(e){if(e)$('#err').textContent=e.message}};
+  $('#go').onclick=go;$('#otp').onkeydown=e=>{if(e.key==='Enter')go()};
+}
+function showSetup(token){
+  app.innerHTML=`<div class="login"><div class="card"><b>${esc(t('setup_title'))}</b>
+   <div class="mut">${esc(t('setup_hint'))}</div>
+   <input id="pw" type="password" placeholder="${esc(t('new_pw'))}" autocomplete="new-password">
+   <button class="pri" id="b1">${esc(t('cont'))}</button><div id="s2"></div><div id="err" class="mut"></div></div></div>`;
+  $('#b1').onclick=async()=>{try{const r=await api('/api/setup',{token,step:'begin',password:$('#pw').value});
+    $('#s2').innerHTML=`<p><a href="${esc(r.uri)}">${esc(t('open_auth'))}</a> ${esc(t('or_key'))} <code style="word-break:break-all">${esc(r.secret)}</code></p>
+     <input id="otp" inputmode="numeric" placeholder="${esc(t('otp_app'))}"><button class="pri" id="b2" style="margin-top:8px">${esc(t('confirm'))}</button>`;
+    $('#b2').onclick=async()=>{try{await api('/api/setup',{token,step:'confirm',otp:$('#otp').value});history.replaceState(0,'','/');showLogin()}catch(e){$('#err').textContent=e.message}}
+  }catch(e){$('#err').textContent=e.message}};
+}
+
+// Build the session rail (nav + session list + accounts). Shown in the left sidebar on desktop,
+// and in the main pane on phones (where the sidebar is hidden).
+const IC={
+  new:'<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>',
+  proj:'<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  skill:'<svg viewBox="0 0 24 24"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></svg>',
+  filt:'<svg viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M3 5h18M6 12h12M10 19h4" stroke-linecap="round"/></svg>',
+  out:'<svg viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+const supHTML=s=>s.supervisor?`<span style="color:var(--ok)">●</span> ${esc(t('sup_on'))}`:`<span style="color:var(--err)">●</span> ${esc(t('sup_off'))}`;
+function railHTML(s){
+  const nav=`<div class="brand"><b>ccfleet</b>${isDemo?`<span class="tag demo">${esc(t('demo_short'))}</span>`:''}<span class="mut" id="supRail">${supHTML(s)}</span></div><div class="rail">
+    <button class="navitem" id="btnNew"><span class="ic">${IC.new}</span>${esc(t('nav_new'))}</button>
+    <button class="navitem" id="btnProj"><span class="ic">${IC.proj}</span>${esc(t('nav_proj'))}</button>
+    <button class="navitem" id="btnSkills"><span class="ic">${IC.skill}</span>${esc(t('nav_skills'))}</button>
+    <div class="seclabel">${esc(t('sessions'))}<span class="sp"></span><span class="ic" style="color:var(--mut)">${IC.filt}</span></div>`;
+  const all=s.sessions||[];
+  const sess=all.length?all.map(x=>{
+    const st=x.stopped?'down':x.busy?'busy':x.status==='running'?'running':x.status==='elsewhere'?'':'down';
+    const w=x.stopped?t('st_stopped'):x.busy?t('st_working'):x.status==='running'?(x.up_min!=null?t('minutes',x.up_min):t('st_idle')):x.status==='elsewhere'?t('st_elsewhere'):t('st_off');
+    return `<div class="sitem${x.name===cur?' sel':''}${x.stopped||x.status==='down'?' dim':''}" data-n="${esc(x.name)}">
+      <span class="dot ${st}"></span><span class="nm">${esc(x.name)}</span>
+      ${x.account?`<span class="mach" title="${esc(t('acct_t'))}">${esc(x.account)}</span>`:''}${x.limit?`<span class="when" title="${esc(t('limit_t'))}">⚠</span>`:''}<span class="when">${esc(w)}</span></div>`;}).join('')
+    :`<div class="mut" style="padding:8px 10px">${esc(t('no_sessions'))}</div>`;
+  const acc=Object.entries(s.accounts).map(([n,u])=>`<div class="acctrow" title="${esc((s.account_info[n]||{}).email||'')}"><b>${esc(n)}</b>${u?
+    `<span class="mut">5h</span><div class="bar"><i style="width:${u.five_hour}%;${u.five_hour>85?'background:var(--err)':''}"></i></div><span class="mut">${Math.round(u.five_hour)}</span>
+     <span class="mut">7d</span><div class="bar"><i style="width:${u.seven_day}%;${u.seven_day>85?'background:var(--err)':''}"></i></div><span class="mut">${Math.round(u.seven_day)}</span>`
+    :'<span class="mut">—</span>'}</div>`).join('');
+  return nav+sess+`<div class="railfoot">${acc||`<span class="mut">${esc(t('no_accounts'))}</span>`}
+      <button class="navitem" id="btnAcc" style="font-size:13px"><span class="ic">${IC.new}</span>${esc(t('add_acc'))}</button>
+      <button class="navitem" id="btnOut" style="font-size:13px;color:var(--mut)"><span class="ic">${IC.out}</span>${esc(t('signout'))}</button>
+      <div style="padding:2px 10px">${langSeg()}</div>
+      <div style="padding:0 10px;font-size:11px;color:var(--mut)">${esc(t('pro'))} <a href="mailto:CONTACT_EMAIL" style="color:var(--mut)">${esc(t('contact'))}</a></div></div></div>`;
+}
+function wireRail(root,accounts){
+  root.querySelectorAll('[data-n]').forEach(el=>el.onclick=()=>showSession(el.dataset.n));
+  const b=id=>root.querySelector('#'+id);
+  if(b('btnAcc'))b('btnAcc').onclick=()=>showAddAccount();
+  if(b('btnOut'))b('btnOut').onclick=async(e)=>{const btn=e.currentTarget;
+    if(!btn.dataset.c){btn.dataset.c=1;btn.lastChild.textContent=t('signout2');return}
+    await api('/api/logout',{});showLogin();};
+  if(b('btnProj'))b('btnProj').onclick=showProjects;
+  if(b('btnSkills'))b('btnSkills').onclick=()=>showSkills();
+  if(b('btnNew'))b('btnNew').onclick=()=>showNew(accounts);
+}
+let lastState=null;
+function paintRail(s){lastState=s;$('#sup').innerHTML=supHTML(s);side.innerHTML=railHTML(s);wireRail(side,Object.keys(s.accounts))}
+async function showList(){
+  onLogin=null;rpaneHide();cur=null;$('#composer').hidden=true;$('#btnBack').hidden=true;setHash([]);
+  $('#shell').classList.remove('solo');side.classList.remove('hide-desktop');
+  const render=async()=>{let s;try{s=await api('/api/state')}catch(e){return}
+    paintRail(s);
+    if(isWide()){ if(!cur) app.innerHTML=`<div class="card mut" style="text-align:center;padding:40px 12px">${esc(t('pick'))}</div>`; }
+    else { app.innerHTML=railHTML(s);wireRail(app,Object.keys(s.accounts)); }
+  };
+  await render();setTimer(render,8000);
+}
+// Refresh just the sidebar's session list (used while a detail view is open on desktop).
+async function refreshRail(){ if(!isWide())return; try{paintRail(await api('/api/state'))}catch(e){} }
+// The left panel is a FIXED navigation frame: on desktop it is ALWAYS visible (sessions + nav),
+// and every view renders into the main pane. On phones the rail is hidden by CSS and the detail
+// takes over (‹ back returns).
+function paneView(){ onLogin=null; rpaneHide();   // any view change drops the session's right pane; a session view re-adds it
+  $('#shell').classList.remove('solo'); side.classList.remove('hide-desktop');
+  $('#btnBack').hidden=false; ensureRail(); }
+// Make sure the rail is populated (it may be empty right after login / a hard navigation).
+async function ensureRail(){ if(!isWide())return;
+  if(!side.children.length){ try{paintRail(await api('/api/state'))}catch(e){} }
+  else refreshRail(); }
+function showAddAccount(){
+  clearInterval(timer);$('#composer').hidden=true;paneView();setHash(['account']);
+  const L={start:n=>api('/api/accounts/login',{name:n}),poll:n=>api('/api/accounts/login?name='+encodeURIComponent(n)),
+    code:(n,c)=>api('/api/accounts/code',{name:n,code:c}),cancel:n=>api('/api/accounts/cancel',{name:n})};
+  app.innerHTML=`<div class="card" style="display:grid;gap:10px"><b>${esc(t('acc_title'))}</b>
+   <div class="mut">${esc(t('acc_hint'))}</div>
+   <div class="row"><input id="aName" placeholder="${esc(t('acc_name'))}" style="flex:1"><button class="pri" id="aGo">${esc(t('start'))}</button></div>
+   <div id="aStep"></div><div id="aErr" class="mut"></div></div>`;
+  let name='';
+  const poll=async()=>{const r=await L.poll(name);
+    if(r.state==='need_code'){clearInterval(timer);
+      $('#aStep').innerHTML=`<a class="pri" href="${esc(r.url)}" target="_blank" rel="noopener" style="display:block;padding:10px;border-radius:8px;background:var(--pri);color:#fff;text-align:center;text-decoration:none">${esc(t('acc_open'))}</a>
+       <div class="row" style="margin-top:8px"><input id="aCode" placeholder="${esc(t('acc_code'))}" style="flex:1" autocomplete="off"><button class="pri" id="aSend">${esc(t('confirm'))}</button></div>
+       <button id="aCancel" style="margin-top:8px">${esc(t('cancel'))}</button>`;
+      $('#aSend').onclick=async()=>{$('#aSend').disabled=true;$('#aErr').textContent=t('confirming');
+        try{const x=await L.code(name,$('#aCode').value);
+          if(x.state==='done'){$('#aStep').innerHTML=`<div>✅ ${esc(t('acc_added'))} <b>${esc(name)}</b> (${esc(x.email)} · ${esc(x.plan)})</div>`;$('#aErr').textContent=''}
+          else{$('#aErr').textContent=x.error||t('failed');$('#aSend').disabled=false}}catch(e){if(e)$('#aErr').textContent=e.message;$('#aSend').disabled=false}};
+      $('#aCancel').onclick=async()=>{await L.cancel(name);showList()};
+    } else if(r.state==='done'){clearInterval(timer);$('#aStep').innerHTML=`✅ ${esc(t('acc_added'))} ${esc(name)}`}
+    else if(r.state!=='waiting_url'){clearInterval(timer);$('#aErr').textContent=r.error||r.state}
+    else $('#aStep').innerHTML=`<span class="mut">${esc(t('acc_wait'))}</span>`};
+  $('#aGo').onclick=async()=>{name=$('#aName').value.trim().toLowerCase();$('#aErr').textContent='';
+    try{await L.start(name);$('#aGo').disabled=true;await poll();setTimer(poll,2500)}
+    catch(e){if(e)$('#aErr').textContent=e.message}};
+}
+// account options: ones not signed in on this machine are shown but disabled; first signed-in one preselected
+function accOpts(names,info){info=info||{};const ok=a=>!info[a]||info[a].signed_in!==false;const pick=names.find(ok);
+  return names.map(a=>`<option value="${esc(a)}" ${ok(a)?'':'disabled'} ${a===pick?'selected':''}>${esc(a)}${ok(a)?'':' '+esc(t('not_signed'))}</option>`).join('')}
+async function showNew(accounts){
+  clearInterval(timer);$('#composer').hidden=true;paneView();setHash(['new']);
+  app.innerHTML=`<div class="card" style="display:grid;gap:10px"><b>${esc(t('np_title'))}</b>
+   <input id="nName" placeholder="${esc(t('np_name'))}">
+   <input id="nPath" placeholder="${esc(t('np_path'))}">
+   <input id="nClone" placeholder="${esc(t('np_clone'))}">
+   <select id="nAcc" style="font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--fg)">
+     ${accOpts(accounts,(lastState||{}).account_info)}</select>
+   <textarea id="nPrompt" rows="4" placeholder="${esc(t('np_prompt'))}"></textarea>
+   <div class="row"><button class="pri" id="nGo">${esc(t('np_go'))}</button><span id="nErr" class="mut"></span></div></div>`;
+  const root=(lastState||{}).projects_root;
+  const fill=()=>{if(root&&!$('#nPath').dataset.t)$('#nPath').value=root.replace(/[\\/]+$/,'')+(root.includes('/')&&!root.includes('\\')?'/':'\\')+$('#nName').value};
+  $('#nName').oninput=fill;
+  $('#nPath').oninput=()=>$('#nPath').dataset.t=1;
+  $('#nGo').onclick=async()=>{$('#nGo').disabled=true;$('#nErr').textContent=t('creating');
+    const args={name:$('#nName').value,path:$('#nPath').value,clone_url:$('#nClone').value,account:$('#nAcc').value,prompt:$('#nPrompt').value};
+    try{await api('/api/projects',args);showSession(args.name.trim()||args.path.split(/[\\/]/).pop())}
+    catch(e){if(e)$('#nErr').textContent=e.message}finally{$('#nGo').disabled=false}};
+}
+async function showSkills(project){
+  clearInterval(timer);$('#composer').hidden=true;paneView();setHash(project?['skills',project]:['skills']);
+  const d=await api('/api/skills'+(project?'?project='+encodeURIComponent(project):''));
+  const v=d.project, on=new Set(v?v.assigned:[]), native=new Set(v?v.native:[]);
+  app.innerHTML=`<div class="card" style="display:grid;gap:8px"><div class="row"><b>${esc(t('sk_title'))}</b><span class="mut">${esc(t('sk_count',d.library.length))}</span>
+     <span style="flex:1"></span><button id="sImp">${esc(t('sk_refresh'))}</button></div>
+   <select id="sProj" style="font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--fg)">
+     <option value="">${esc(t('sk_pick'))}</option>${d.projects.map(p=>`<option ${v&&v.cwd===p?'selected':''}>${esc(p)}</option>`).join('')}</select>
+   ${v?`<div class="row"><input id="sQ" placeholder="${esc(t('sk_filter'))}" style="flex:1"><button class="pri" id="sSave">${esc(t('sk_save',on.size))}</button></div>
+     <div class="mut">${esc(t('sk_native'))}${esc(v.native.join(', ')||'—')}</div>`:''}</div>
+   <div id="sList">${v?d.library.map(s=>`<label class="card row" data-q="${esc((s.name+' '+s.description).toLowerCase())}" style="margin-bottom:6px;align-items:flex-start;cursor:pointer">
+     <input type="checkbox" value="${esc(s.name)}" ${on.has(s.name)?'checked':''} ${native.has(s.name)?'disabled':''} style="width:auto;margin-top:3px">
+     <span><b>${esc(s.name)}</b>${native.has(s.name)?` <span class="tag">${esc(t('sk_own'))}</span>`:''}<br><span class="mut">${esc(s.description)}</span></span></label>`).join(''):''}</div>`;
+  $('#sProj').onchange=e=>showSkills(e.target.value);
+  $('#sImp').onclick=async()=>{$('#sImp').disabled=true;await api('/api/skills/import',{});showSkills(v&&v.cwd)};
+  if(!v)return;
+  const count=()=>$('#sSave').textContent=t('sk_save',app.querySelectorAll('#sList input:checked:not(:disabled)').length);
+  app.querySelectorAll('#sList input').forEach(i=>i.onchange=count);
+  $('#sQ').oninput=e=>{const q=e.target.value.toLowerCase();app.querySelectorAll('#sList label').forEach(l=>l.hidden=q&&!l.dataset.q.includes(q))};
+  $('#sSave').onclick=async()=>{const skills=[...app.querySelectorAll('#sList input:checked:not(:disabled)')].map(i=>i.value);
+    $('#sSave').disabled=true;try{await api('/api/skills/assign',{project:v.cwd,skills});showSkills(v.cwd)}catch(e){if(e)alertBar(e.message)}};
+}
+const fmtSize=b=>b==null?'':b<1024?b+' B':b<1048576?(b/1024).toFixed(0)+' KB':(b/1048576).toFixed(1)+' MB';
+async function upload(project,dir,files){const out=[];
+  for(const f of files){const r=await fetch(`/api/files/upload?project=${encodeURIComponent(project)}&dir=${encodeURIComponent(dir)}&name=${encodeURIComponent(f.name)}`,
+    {method:'POST',headers:{'X-Fleet':'1'},body:f});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);out.push(j.path)}
+  return out}
+const INBOX='.ccfleet-inbox';
+async function showFiles(project,rel,sessName){
+  clearInterval(timer);cur=null;$('#composer').hidden=true;paneView();setHash(sessName?['files',project,rel||'',sessName]:['files',project,rel||'']);
+  let d;try{d=await api(`/api/files?project=${encodeURIComponent(project)}&path=${encodeURIComponent(rel)}`)}catch(e){if(e)alertBar(e.message);return}
+  const st=await api('/api/state');const sess=st.sessions.filter(x=>(x.cwd||'').toLowerCase()===project.toLowerCase());
+  const crumbs=[''].concat(d.rel?d.rel.split('/'):[]);
+  const join=(a,b)=>a?a+'/'+b:b;
+  const sep=d.root.includes('\\')?'\\':'/';
+  app.innerHTML=`<div class="card" style="display:grid;gap:8px"><div class="row"><b>📁 ${esc(project.split(/[\\/]/).pop())}</b><span style="flex:1"></span>
+      ${sessName?`<button id="fBack">‹ ${esc(sessName)}</button>`:''}<button id="fInbox">${INBOX}</button></div>
+    <div class="row mut">${crumbs.map((c,i)=>`<a href="#" data-cr="${esc(crumbs.slice(1,i+1).join('/'))}">${esc(c||t('f_root'))}</a>`).join(' / ')}</div>
+    <div class="row"><button class="pri" id="fUp">${esc(t('f_upload'))}</button><input type="file" id="fIn" multiple hidden>
+      <input id="fDir" placeholder="${esc(t('f_newdir'))}" style="flex:1;min-width:120px"><button id="fMk">${esc(t('f_mk'))}</button></div>
+    ${sess.length?`<div class="row"><span class="mut">${esc(t('f_sendto'))}</span><select id="fSess" style="font:inherit;padding:6px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--fg)">
+      ${sess.map(x=>`<option ${x.name===sessName?'selected':''}>${esc(x.name)}</option>`).join('')}</select>
+      <input id="fNote" placeholder="${esc(t('f_note'))}" style="flex:1;min-width:140px"></div>`:`<div class="mut">${esc(t('f_nosess'))}</div>`}
+    <div class="mut" style="word-break:break-all">${esc(d.abs)}</div></div>`+
+   d.items.map(it=>`<div class="card row" style="margin-bottom:6px;padding:8px 12px">
+      ${it.dir?`<a href="#" data-dir="${esc(join(d.rel,it.name))}" style="flex:1">📁 ${esc(it.name)}</a>`
+        :`<span style="flex:1;word-break:break-all">${it.secret?'🔒 '+esc(it.name):`<a href="/api/files/get?project=${encodeURIComponent(project)}&path=${encodeURIComponent(join(d.rel,it.name))}" target="_blank" rel="noopener">${esc(it.name)}</a>`}</span>
+         <span class="mut">${fmtSize(it.size)}</span>
+         ${sess.length&&!it.secret?`<button data-send="${esc(join(d.rel,it.name))}">→ Claude</button>`:''}
+         ${it.secret?'':`<button class="dan" data-del="${esc(join(d.rel,it.name))}">${esc(t('del'))}</button>`}`}</div>`).join('')+
+   (d.items.length?'':`<div class="card mut">${esc(t('empty'))}</div>`);
+  const go=r=>showFiles(project,r,sessName);
+  app.querySelectorAll('[data-cr]').forEach(a=>a.onclick=e=>{e.preventDefault();go(a.dataset.cr)});
+  app.querySelectorAll('[data-dir]').forEach(a=>a.onclick=e=>{e.preventDefault();go(a.dataset.dir)});
+  $('#fInbox').onclick=()=>go(INBOX);if(sessName)$('#fBack').onclick=()=>showSession(sessName);
+  $('#fUp').onclick=()=>$('#fIn').click();
+  $('#fIn').onchange=async e=>{try{await upload(project,d.rel||INBOX,[...e.target.files]);go(d.rel||INBOX)}catch(x){alertBar(x.message)}};
+  $('#fMk').onclick=async()=>{const n=$('#fDir').value.trim();if(!n)return;try{await api('/api/files/mkdir',{project,path:join(d.rel,n)});go(join(d.rel,n))}catch(x){if(x)alertBar(x.message)}};
+  app.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!b.dataset.c){b.dataset.c=1;b.textContent=t('sure');return}
+    try{await api('/api/files/delete',{project,path:b.dataset.del});go(d.rel)}catch(x){if(x)alertBar(x.message)}});
+  app.querySelectorAll('[data-send]').forEach(b=>b.onclick=async()=>{const sn=$('#fSess').value,abs=d.root+sep+b.dataset.send.replace(/\//g,sep);
+    const note=$('#fNote').value.trim();try{await api(`/api/session/${encodeURIComponent(sn)}/send`,{text:(note?note+' — ':'')+'File: '+abs});
+      b.textContent=t('sent');b.disabled=true}catch(x){if(x)alertBar(x.message)}});
+}
+$('#btnAttach').onclick=()=>{if(!cur){alertBar(t('att_need'));return}$('#attFile').click()};
+$('#attFile').onchange=async e=>{
+  const files=[...e.target.files]; if(!files.length)return;
+  return withBusy($('#btnAttach'),async()=>{
+    try{const s=(await api('/api/state')).sessions.find(x=>x.name===cur);
+      const paths=await upload(s.cwd,INBOX,files);
+      $('#txt').value=($('#txt').value?$('#txt').value+' ':'')+paths.map(p=>'File: '+p).join(' ');saveDraft();
+      e.target.value=''}
+    catch(x){alertBar(t('att_fail')+x.message)}
+  },'⏳')};
+// Claude Code menus (questions, permission prompts, /model…) → buttons; "Type something" → input
+let menuSig='';
+function renderMenu(el,menu,send,keys){
+  if(!menu){el.innerHTML='';menuSig='';return}
+  const sig=JSON.stringify(menu.options.map(o=>o.label));
+  if(sig===menuSig&&el.querySelector('.menu'))return;   // don't wipe a half-typed answer
+  menuSig=sig;
+  // A long picker is drawn by Claude Code in a ~3-row scrolling viewport, so we show what it drew
+  // plus ↑/↓ to scroll the menu itself — same as pressing the arrows in the terminal.
+  const nav=(menu.scroll&&keys)?`<div class="row" style="margin-top:8px;gap:6px">
+      <button data-mv="up">↑</button><button data-mv="down">↓</button>
+      <span class="mut">${esc(t('m_scroll'))}</span></div>`:'';
+  el.innerHTML=`<div class="card menu" style="border-color:var(--pri)"><div class="mut">${esc(t('m_asking'))}${menu.question?': <b>'+esc(menu.question)+'</b>':''}</div>
+    <div style="display:grid;gap:6px;margin-top:8px">${menu.options.map(o=>o.free
+      ?`<div class="row" style="flex-wrap:nowrap"><input data-free="${o.n}" placeholder="${esc(o.label)}" style="flex:1"><button class="pri" data-fs="${o.n}">${esc(t('send'))}</button></div>`
+      :`<button data-ch="${o.n}" style="text-align:left${o.n===menu.current?';border-color:var(--pri)':''}">${o.n}. ${esc(o.label)}</button>`).join('')}</div>${nav}</div>`;
+  el.querySelectorAll('[data-mv]').forEach(b=>b.onclick=async()=>{
+    try{await keys([b.dataset.mv]);menuSig='';setTimeout(()=>redraw&&redraw(),350)}catch(e){if(e)alertBar(e.message)}});
+  el.querySelectorAll('[data-ch]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await send(+b.dataset.ch)}catch(e){if(e)alertBar(e.message)}menuSig=''});
+  el.querySelectorAll('[data-fs]').forEach(b=>b.onclick=async()=>{const i=el.querySelector(`[data-free="${b.dataset.fs}"]`);if(!i.value.trim())return;
+    b.disabled=true;try{await send(+b.dataset.fs,i.value.trim())}catch(e){if(e)alertBar(e.message)}menuSig=''});
+}
+async function showProjects(){
+  clearInterval(timer);$('#composer').hidden=true;paneView();setHash(['project']);const ps=await api('/api/projects');
+  app.innerHTML=`<div class="card"><b>${esc(t('pr_title'))}</b></div>`+ps.map(p=>`<div class="card" data-p="${esc(p.cwd)}" style="cursor:pointer"><b>${esc(p.cwd)}</b>
+   <div class="mut">${when(p.last)} · ${esc(t('pr_n',p.sessions))} · ${esc(p.accounts.join(', '))}</div></div>`).join('')
+   +(ps.length?'':`<div class="card mut">${esc(t('pr_none'))}</div>`);
+  app.querySelectorAll('[data-p]').forEach(el=>el.onclick=()=>showProject(el.dataset.p));
+}
+async function showProject(cwd){
+  clearInterval(timer);$('#composer').hidden=true;paneView();setHash(['project',cwd]);
+  const items=await api('/api/project-sessions?cwd='+encodeURIComponent(cwd));
+  app.innerHTML=`<div class="card"><div class="row"><b style="word-break:break-all">${esc(cwd)}</b><span style="flex:1"></span>
+     <button id="pFiles">${esc(t('p_files'))}</button><button class="pri" id="pNew">${esc(t('p_new'))}</button></div><div class="mut">${esc(t('p_recent',items.length))}</div></div>`+
+   items.map(x=>`<div class="card"><div class="row"><span class="mut">${when(x.last)} · ${x.size_kb} KB · ${esc(x.account)}</span>
+     <span style="flex:1"></span>${x.managed_as?`<button data-go="${esc(x.managed_as)}">${esc(t('managed',x.managed_as))}</button>`
+       :`<button class="pri" data-open="${esc(x.session_id)}" data-acc="${esc(x.account)}">${esc(t('reopen'))}</button>`}</div>
+     <div style="margin-top:4px">${esc(x.title)||`<span class="mut">${esc(t('untitled'))}</span>`}</div><div class="mut">${esc(x.session_id)}</div></div>`).join('');
+  const open=async(sid,acc)=>{try{const r=await api('/api/session-open',{cwd,session_id:sid,account:acc});tab='screen';showSession(r.name)}catch(e){if(e)alertBar(e.message)}};
+  $('#pNew').onclick=()=>open('', 'main');$('#pFiles').onclick=()=>showFiles(cwd,'');
+  app.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{b.disabled=true;open(b.dataset.open,b.dataset.acc)});
+  app.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>showSession(b.dataset.go));
+}
+async function showSession(name){
+  cur=name;clearInterval(timer);$('#composer').hidden=false;paneView();setHash(['session',name,tab]);
+  const enc=encodeURIComponent(name);let ver='',msgs=[],live='',screen='',info={},gen=(showSession.gen=(showSession.gen||0)+1);
+  // header (status/actions/tabs) refreshes every 8 s; the body streams via long-poll /watch
+  app.innerHTML=`<div class="card" id="sHead"></div><div id="sBody"></div><div id="sPend"></div><div id="sLive"></div><div id="sMenu"></div>`;menuSig='';loadDraft();
+  const head=async()=>{if(cur!==name)return;const stAll=await api('/api/state');info=stAll.sessions.find(x=>x.name===name)||{};const s=info;
+    if(isWide())paintRail(stAll);else lastState=stAll;   // keep the rail live + highlight current
+    const run=s.status==='running';
+    $('#sHead').innerHTML=`<div class="row hrow"><button class="hBack" title="${esc(t('back'))}">‹</button><b title="${esc(name)}">${esc(name)}</b>${accPick(Object.keys(stAll.accounts||{}),s.account,stAll.account_info)}
+      <span class="mut" style="white-space:nowrap">${esc(s.busy?t('s_working'):run?t('s_idle'):s.status==='elsewhere'?t('s_else'):t('s_off'))}</span>
+      <span class="seg"><button data-t="messages" class="${tab==='messages'?'on':''}">${esc(t('chat'))}</button><button data-t="screen" class="${tab==='screen'?'on':''}">${esc(t('screen'))}</button></span>
+      <span style="flex:1"></span>
+      ${run?'':s.status==='elsewhere'?`<button data-a="takeover">${esc(t('takeover'))}</button>`:`<button class="pri" data-a="start">${esc(t('startB'))}</button>`}
+      <button class="rpTog" title="${esc(t('files_t'))}">☰</button>
+      ${ddMenu(`<button id="sRen">${esc(t('rename'))}</button>${run?`<button data-a="restart">${esc(t('restart'))}</button><button class="dan" data-a="stop">${esc(t('stop'))}</button>`:''}
+        <button id="sFiles">${esc(t('projfiles'))}</button>${s.remote_url?`<a href="${esc(s.remote_url)}" target="_blank" rel="noopener">${esc(t('open_ai'))}</a>`:''}`)}</div>`;
+    rpaneShow({name,cwd:s.cwd});
+    $('#sFiles').onclick=()=>showFiles(s.cwd,'',name);
+    wireAccPick($('#sHead'),s.account,s.busy,acc=>api(`/api/session/${enc}/action`,{action:'takeover',account:acc}),()=>setTimeout(head,1500));
+    const ren=$('#sRen');if(ren)ren.onclick=async()=>{const nn=prompt(t('newname'),name);if(!nn||nn===name)return;
+      try{await api('/api/session-rename',{old:name,new:nn.trim()});showSession(nn.trim())}catch(e){if(e)alertBar(e.message)}};
+    $('#sHead').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;head();paint(true)});
+    $('#sHead').querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{if(b.dataset.a==='stop'&&!confirmInline(b))return;
+      withBusy(b,async()=>{try{await api(`/api/session/${enc}/action`,{action:b.dataset.a});alertBar(t('sentA',b.dataset.a))}
+        catch(e){if(e)alertBar(e.message)}setTimeout(head,1500)})});};
+  const paint=(force)=>{if(cur!==name)return;const atBottom=nearBottom();
+    if(tab==='messages'){
+      $('#sBody').innerHTML=msgs.map(msgHTML).join('')||`<div class="mut">${esc(t('no_msgs'))}</div>`;renderPend(msgs);
+      $('#sLive').innerHTML=live?`<div class="msg assistant" style="opacity:.85;border-style:dashed"><span class="mut">${esc(t('responding'))}</span>\n${esc(live)}</div>`:'';
+    }else{$('#sBody').innerHTML=`<pre class="screen">${esc(screen)}</pre>`;$('#sLive').innerHTML=''}
+    if(atBottom||force)toBottom();};
+  redraw=()=>{ver='';};  // next watch round returns immediately with fresh data
+  await head();setTimer(head,8000);
+  while(cur===name&&showSession.gen===gen){
+    try{const r=await api(`/api/session/${enc}/watch?v=${encodeURIComponent(ver)}&n=60${tab==='screen'?'&screen=1':''}`);
+      if(cur!==name||showSession.gen!==gen)break;
+      if(r.messages)msgs=r.messages;live=r.live||'';if(r.screen!=null)screen=r.screen;
+      renderMenu($('#sMenu'),r.menu,(n,text)=>api(`/api/session/${enc}/choose`,{n,text}),ks=>api(`/api/session/${enc}/keys`,{keys:ks}));
+      const first=!ver;ver=r.v;paint(first);
+      if(r.busy||r.menu||tab==="screen")await new Promise(ok=>setTimeout(ok,1200));   // busy or screen tab → ~1.2 s refresh
+    }catch(e){if(e===0)return;await new Promise(ok=>setTimeout(ok,3000))}
+  }
+}
+function confirmInline(b,msg){if(b.dataset.c)return true;const old=b.textContent;b.dataset.c=1;b.textContent=msg||t('stop2');setTimeout(()=>{delete b.dataset.c;b.textContent=old},4000);return false}
+const msgHTML=x=>`<div class="msg ${x.kind==='tool'?'tool':x.role}">${x.queued?`<span class="q">${esc(t('queued'))}</span>\n`:''}${x.kind==='tool'?'⚙ ':''}${esc(x.text)}</div>`;
+// What you sent stays on screen (and in localStorage) until the transcript shows it, so a prompt
+// that never reached the TUI is visible and can be resent.
+const PEND=(()=>{try{return JSON.parse(localStorage.getItem('ccfleet.pend')||'{}')}catch(e){return {}}})();
+const pkey=()=>String(cur);
+const savePend=()=>lsSet('ccfleet.pend',JSON.stringify(PEND));
+const norm=s=>String(s||'').replace(/\s+/g,' ').trim();
+function renderPend(msgs){const el=$('#sPend');if(!el||!cur)return;const k=pkey();let L=PEND[k]||[];
+  if(msgs){const us=msgs.filter(m=>m.role==='user').map(m=>norm(m.text));
+    const n0=L.length;L=L.filter(p=>!(p.st==='sent'&&us.some(u=>u.includes(norm(p.text).slice(0,80))))&&Date.now()-p.at<12*3600e3);
+    if(L.length!==n0){PEND[k]=L;savePend()}}
+  el.innerHTML=L.map(p=>{const age=(Date.now()-p.at)/1000,bad=p.st==='err'||(p.st==='sent'&&age>=90);
+    const st=p.st==='sending'?esc(t('sending')):p.st==='err'?esc(t('send_err'))+esc(p.err||''):age<90?esc(t('typed')):esc(t('notyet'));
+    return `<div class="msg user pend">${esc(p.text)}<div class="mut" style="margin-top:4px">${st}${bad?` <button data-pr="${p.id}">${esc(t('resend'))}</button> <button data-px="${p.id}">${esc(t('dismiss'))}</button>`:''}</div></div>`}).join('');
+  el.querySelectorAll('[data-pr]').forEach(b=>b.onclick=()=>withBusy(b,()=>deliver((PEND[k]||[]).find(p=>p.id===b.dataset.pr))));
+  el.querySelectorAll('[data-px]').forEach(b=>b.onclick=()=>{PEND[k]=(PEND[k]||[]).filter(p=>p.id!==b.dataset.px);savePend();renderPend()})}
+async function deliver(p){if(!p)return;p.st='sending';renderPend();
+  try{await api(`/api/session/${encodeURIComponent(p.name)}/send`,{text:p.text});
+    p.st='sent';p.at=Date.now();delete p.err}
+  catch(e){p.st='err';p.err=e&&e.message||t('conn_lost');if(e)alertBar(e.message)}
+  savePend();renderPend()}
+async function send(){if(pasting>0){alertBar(t('upl_wait'));return}
+  const text=$('#txt').value.trim();if(!text||!cur)return;
+  const p={id:Math.random().toString(36).slice(2,9),text,at:Date.now(),st:'sending',name:cur};
+  (PEND[pkey()]=PEND[pkey()]||[]).push(p);savePend();
+  $('#txt').value='';saveDraft();renderPend();toBottom();
+  await withBusy($('#btnSend'),()=>deliver(p),t('sendingB'));
+  if(p.st==='sent'){if(text.startsWith('/'))tab='screen';setTimeout(()=>redraw&&redraw(),900)}}
+// the composer is shared by every session: each keeps its own draft
+const draftKey=()=>'ccfleet.draft.'+pkey();
+function loadDraft(){$('#txt').value=lsGet(draftKey())||''}
+function saveDraft(){if(!cur)return;const v=$('#txt').value;lsSet(draftKey(),v||null)}
+$('#txt').addEventListener('input',saveDraft);
+// ⋯ dropdown for the less-used session actions (the header has to fit one row)
+const ddMenu=items=>`<span class="dd"><button class="ddb" title="${esc(t('more_actions'))}">⋯</button><div class="ddm" hidden>${items}</div></span>`;
+document.addEventListener('click',e=>{const tg=e.target.closest('.ddb');
+  document.querySelectorAll('.ddm').forEach(m=>{if(tg&&m.previousElementSibling===tg){m.hidden=!m.hidden;return}
+    const b=e.target.closest('.ddm button,.ddm a');
+    if(!m.contains(e.target))m.hidden=true;else if(b)setTimeout(()=>{if(!b.dataset.c)m.hidden=true},0)});
+  if(e.target.closest('.rpTog'))$('#rpane').classList.toggle('open')});
+// ---- right pane: the files this session (and earlier conversations of the project) produced / was sent ----
+const rp={k:null,timer:null,sig:'',ctx:null,flt:'all',path:''};
+function rpaneHide(){clearInterval(rp.timer);rp.k=null;$('#shell').classList.remove('three');$('main').classList.remove('three');
+  $('#composer').classList.remove('three');$('#rpane').classList.remove('open');$('#rpane').innerHTML=''}
+function rpaneShow(ctx){const k=ctx.name+'|'+(ctx.cwd||'')+'|'+lang;if(rp.k===k)return;
+  rp.k=k;rp.ctx=ctx;rp.sig='';rp.path='';clearInterval(rp.timer);
+  $('#shell').classList.add('three');$('main').classList.add('three');$('#composer').classList.add('three');
+  const P=$('#rpane');
+  P.innerHTML=`<div class="rtabs"><button class="on">${esc(t('rp_files'))}</button><span style="flex:1"></span>
+    <button class="rpTog" title="${esc(t('close'))}">✕</button></div><div id="rpBody"></div>`;
+  rpDraw(true);rp.timer=setInterval(()=>{if(rp.k===k)rpDraw(false).catch(()=>{})},12000)}
+const fltSeg=flt=>`<span class="seg"><button data-f="all" class="${flt==='all'?'on':''}">${esc(t('f_all'))}</button><button data-f="media" class="${flt==='media'?'on':''}">${esc(t('f_media'))}</button><button data-f="user" class="${flt==='user'?'on':''}">${esc(t('f_user'))}</button><button data-f="tree" class="${flt==='tree'?'on':''}">${esc(t('f_tree'))}</button></span>`;
+async function rpDraw(fresh){const c=rp.ctx,k=rp.k,B=$('#rpBody');if(!c||!B)return;
+  if(!c.cwd){B.innerHTML=`<div class="ritem mut">${esc(t('loading'))}</div>`;return}
+  if(rp.flt==='tree'){await rpTree(c,k,fresh);return}
+  const r=await api(`/api/session/${encodeURIComponent(c.name)}/files`);if(rp.k!==k)return;
+  const sig=JSON.stringify(r.items.map(i=>[i.rel,i.mtime]))+(rp.flt||'');if(sig===rp.sig&&!fresh)return;rp.sig=sig;   // unchanged → keep players as they are
+  const VIA={write:t('via_write'),bash:t('via_bash'),text:t('via_text'),user:t('via_user')};
+  const flt=rp.flt||'all',items=r.items.filter(i=>flt==='all'||(flt==='media'?['image','video','audio','pdf'].includes(i.kind):i.via==='user'));
+  const url=i=>i.src==='paste'?'/api/paste/get?name='+encodeURIComponent(i.rel):`/api/files/get?project=${encodeURIComponent(r.cwd)}&path=${encodeURIComponent(i.rel)}`;
+  const kb=n=>n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
+  B.innerHTML=`<div class="row" style="margin-bottom:6px">${fltSeg(flt)}<span class="mut">${items.length}</span></div>`+(items.map(i=>`<div class="ritem">
+      ${i.kind==='image'?`<a href="${url(i)}" target="_blank" rel="noopener"><img loading="lazy" src="${url(i)}" alt=""></a>`
+        :i.kind==='video'?`<video controls preload="metadata" src="${url(i)}"></video>`:i.kind==='audio'?`<audio controls preload="none" src="${url(i)}"></audio>`:''}
+      <div class="row"><b style="flex:1;min-width:0" title="${esc(i.rel)}">${i.kind==='file'||i.kind==='pdf'?'📄 ':''}${esc(i.name)}</b></div>
+      <div class="row mut"><span>${esc(VIA[i.via]||'')} · ${kb(i.size)} · ${when(i.mtime)}</span><span style="flex:1"></span>
+        <a href="${url(i)}" target="_blank" rel="noopener">${esc(t('open'))}</a> <a href="${url(i)}&dl=1">${esc(t('download'))}</a></div>
+      ${i.src==='project'&&i.rel.includes('/')?`<div class="mut" style="font-size:11px">${esc(i.rel)}</div>`:''}</div>`).join('')
+    ||`<div class="ritem mut">${esc(t('rp_none'))}</div>`);
+  B.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{rp.flt=b.dataset.f;rp.sig='';rpDraw(true)});
+}
+// the whole project folder, read-only browse (secret-looking files are listed but never served)
+async function rpTree(c,k,fresh){const B=$('#rpBody');if(!B)return;const rel=rp.path||'';
+  let d;try{d=await api(`/api/files?project=${encodeURIComponent(c.cwd)}&path=${encodeURIComponent(rel)}`)}
+  catch(e){if(rp.k===k)B.innerHTML=`<div class="ritem mut">${esc(e&&e.message||t('error'))}</div>`;return}
+  if(rp.k!==k)return;const sig='T'+JSON.stringify(d.items.map(i=>[i.name,i.mtime]))+rel;if(sig===rp.sig&&!fresh)return;rp.sig=sig;
+  const join=(a,b)=>a?a+'/'+b:b,crumbs=[''].concat(d.rel?d.rel.split('/'):[]);
+  const url=r=>`/api/files/get?project=${encodeURIComponent(c.cwd)}&path=${encodeURIComponent(r)}`;
+  B.innerHTML=`<div class="row" style="margin-bottom:6px">${fltSeg('tree')}</div>
+    <div class="row mut" style="margin-bottom:6px;flex-wrap:wrap">${crumbs.map((x,i)=>`<a href="#" data-cr="${esc(crumbs.slice(1,i+1).join('/'))}">${esc(x||t('f_root'))}</a>`).join(' / ')}</div>`+
+    (d.items.map(it=>`<div class="ritem row">${it.dir?`<a href="#" data-dir="${esc(join(d.rel,it.name))}" style="flex:1;min-width:0">📁 ${esc(it.name)}</a>`
+      :it.secret?`<span style="flex:1" class="mut">🔒 ${esc(it.name)}</span>`
+      :`<span style="flex:1;min-width:0;word-break:break-all">${esc(it.name)}</span><span class="mut">${fmtSize(it.size)}</span>
+        <a href="${url(join(d.rel,it.name))}" target="_blank" rel="noopener">${esc(t('open'))}</a> <a href="${url(join(d.rel,it.name))}&dl=1">${esc(t('download'))}</a>`}</div>`).join('')
+     ||`<div class="ritem mut">${esc(t('empty'))}</div>`);
+  const go=r=>{rp.path=r;rp.sig='';rpTree(c,k,true)};
+  B.querySelectorAll('[data-cr]').forEach(a=>a.onclick=e=>{e.preventDefault();go(a.dataset.cr)});
+  B.querySelectorAll('[data-dir]').forEach(a=>a.onclick=e=>{e.preventDefault();go(a.dataset.dir)});
+  B.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{rp.flt=b.dataset.f;rp.sig='';rpDraw(true)});
+}
+function alertBar(m){const d=document.createElement('div');d.className='card';d.style.color='var(--err)';d.textContent=m;app.prepend(d);setTimeout(()=>d.remove(),5000)}
+// quick bar: special keys + slash commands → then show the screen (menus/pickers render there)
+let redraw=null;
+document.querySelectorAll('#quick [data-k]').forEach(b=>b.onclick=()=>{if(!cur)return;
+  withBusy(b,async()=>{
+    try{await api(`/api/session/${encodeURIComponent(cur)}/keys`,{keys:[b.dataset.k]});
+      tab='screen';setTimeout(()=>redraw&&redraw(),700)}catch(e){if(e)alertBar(e.message)}})});
+document.querySelectorAll('#quick [data-c]').forEach(b=>b.onclick=()=>{
+  if(b.dataset.c==='/clear'&&!b.dataset.ok){b.dataset.ok=1;const old=b.innerHTML;b.textContent=t('clear_q');setTimeout(()=>{delete b.dataset.ok;b.innerHTML=old},4000);return}
+  $('#txt').value=b.dataset.c;send(true)});
+// ✨ rewrite the draft with Haiku; ↩ brings the original back
+let draftOrig=null;
+$('#btnRewrite').onclick=()=>{const text=$('#txt').value.trim();if(!text){alertBar(t('rw_need'));return}
+  return withBusy($('#btnSend'),async()=>{try{const r=await api('/api/rewrite',{text});
+    draftOrig=text;$('#txt').value=r.text;saveDraft();$('#btnUndo').hidden=false;$('#txt').focus()}catch(e){if(e)alertBar(e.message)}},'✨ …')};
+$('#btnUndo').onclick=()=>{if(draftOrig!==null){$('#txt').value=draftOrig;draftOrig=null}$('#btnUndo').hidden=true};
+$('#txt').addEventListener('input',()=>{if(draftOrig!==null&&!$('#txt').value){draftOrig=null;$('#btnUndo').hidden=true}});
+let pasting=0;
+// paste an image (screenshot) → saved on this machine → its path goes in the prompt
+$('#txt').addEventListener('paste',e=>{
+  // .files first: some browsers list one screenshot twice in .items
+  const fl=[...(e.clipboardData?.files||[])].filter(f=>f.type.startsWith('image/'));
+  const imgs=fl.length?fl:[...(e.clipboardData?.items||[])].filter(i=>i.kind==='file'&&i.type.startsWith('image/')).map(i=>i.getAsFile()).slice(0,1);
+  if(!imgs.length||!cur)return;               // plain text: the browser pastes it as usual
+  e.preventDefault();const ta=$('#txt');
+  for(const f of imgs){
+    const mark=`[${t('up_img',Math.round(f.size/1024))}]`,at=ta.selectionStart;
+    ta.setRangeText(mark+' ',at,ta.selectionEnd,'end');pasting++;
+    // send() waits while this is in flight, so the placeholder never goes out
+    fetch('/api/paste',{method:'POST',headers:{'X-Fleet':'1','Content-Type':'application/octet-stream'},body:f})
+      .then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);ta.value=ta.value.replace(mark,`[image: ${j.path}]`);saveDraft()})
+      .catch(err=>{ta.value=ta.value.replace(mark+' ','');alertBar(t('paste_fail')+err.message)})
+      .finally(()=>pasting--)}
+});
+// account picker on a session: pick another account → switch & take over (transcript copied, reopened there)
+function accPick(accs,curAcc,info){info=info||{};
+  if(accs.length<2)return `<span class="tag">${esc(curAcc)}</span>`;
+  return `<select class="accSel" title="${esc(t('acc_sel_t'))}" style="width:auto;padding:3px 6px">${accs.map(a=>{const no=a!==curAcc&&info[a]&&info[a].signed_in===false;return `<option value="${esc(a)}" ${a===curAcc?'selected':''} ${no?'disabled':''}>${esc(a)}${no?' '+esc(t('not_signed')):''}</option>`}).join('')}</select>
+    <button class="accGo" hidden title="${esc(t('switch_t'))}">${esc(t('switch'))}</button>`}
+function wireAccPick(root,curAcc,busy,run,done){
+  const sel=root.querySelector('.accSel'),go=root.querySelector('.accGo');if(!sel)return;
+  sel.onchange=()=>{go.hidden=sel.value===curAcc};
+  go.onclick=()=>{if(busy&&!confirmInline(go,t('switch_busy')))return;     // busy: the current turn gets cut off
+    withBusy(go,async()=>{try{await run(sel.value);alertBar(t('switching',sel.value));done&&done()}catch(e){if(e)alertBar(e.message)}},'…')}}
+// ＋ Commands: tools + slash commands in one popup next to the keys
+$('#btnMore').onclick=e=>{e.stopPropagation();$('#cmdMenu').hidden=!$('#cmdMenu').hidden};
+$('#cmdMenu').addEventListener('click',e=>{if(e.target.closest('button'))$('#cmdMenu').hidden=true});
+document.addEventListener('click',e=>{if(!e.target.closest('#cmdMenu,#btnMore'))$('#cmdMenu').hidden=true});
+$('#btnSend').onclick=()=>send();$('#txt').onkeydown=e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))send()};
+// ‹ back walks to the parent view; a view opened directly (F5 on a deep link) still works
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('.hBack'))$('#btnBack').onclick()});
+$('#btnBack').onclick=()=>{const [parts]=backTarget();if(!parts.length){showList();return}location.hash='#'+parts.map(encodeURIComponent).join('/')};
+boot();
+</script>
+</body>
+</html>
