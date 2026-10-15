@@ -112,6 +112,8 @@ a{color:var(--pri)}
 .ritem img,.ritem video{max-width:100%;max-height:220px;border-radius:6px;display:block;margin-bottom:4px}
 .ritem audio{width:100%}.ritem button{padding:3px 8px;font-size:12px}
 .menu .mhead{margin-top:6px}.menu .mhead .tag{font-weight:600;color:var(--pri);border-color:var(--pri)}.menu .mq{margin-top:4px}
+.toast{position:fixed;z-index:50;left:50%;transform:translateX(-50%);top:calc(var(--hh,56px) + 10px);width:max-content;max-width:min(560px,calc(100vw - 24px));color:var(--err);border-color:var(--err);box-shadow:0 6px 24px rgba(0,0,0,.3)}
+.toast.ok{color:var(--ok);border-color:var(--ok)}
 .msg.pend{opacity:.8;border:1px dashed var(--bd)}.msg .q{font-size:12px;color:var(--warn)}
 /* ---- app shell — desktop only; phones keep the page scroll ---- */
 select{font:inherit;color:var(--fg);background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 9px center;
@@ -629,7 +631,7 @@ async function showSession(name){
   // header (status/actions/tabs) refreshes every 8 s; the body streams via long-poll /watch
   app.innerHTML=`<div class="card" id="sHead"></div><div id="sBody"></div><div id="sPend"></div><div id="sLive"></div><div id="sMenu"></div>`;menuSig='';loadDraft();
   const head=async()=>{if(cur!==name)return;const stAll=await api('/api/state');info=stAll.sessions.find(x=>x.name===name)||{};const s=info;
-    if(isWide())paintRail(stAll);else lastState=stAll;   // keep the rail live + highlight current
+    if(isWide())paintRail(stAll);else{lastState=stAll;$('#sup').innerHTML=supHTML(stAll)}   // keep the rail live + highlight current
     const run=s.status==='running';if(!s.busy&&askNow)s.asking=true;
     $('#sHead').innerHTML=`<div class="row hrow"><button class="hBack" title="${esc(t('back'))}">‹</button><b title="${esc(name)}">${esc(name)}</b>${accPick(Object.keys(stAll.accounts||{}),s.account,stAll.account_info)}
       <span class="mut hst${run&&!s.busy&&s.asking?' ask':''}">${esc(s.busy?t('s_working'):run&&s.asking?t('s_asking'):run?t('s_idle'):s.status==='elsewhere'?t('s_else'):t('s_off'))}</span>
@@ -758,7 +760,8 @@ async function rpTree(c,k,fresh){const B=$('#rpBody');if(!B)return;const rel=rp.
   B.querySelectorAll('[data-dir]').forEach(a=>a.onclick=e=>{e.preventDefault();go(a.dataset.dir)});
   B.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{rp.flt=b.dataset.f;rp.sig='';rpDraw(true)});
 }
-function alertBar(m,ok){const d=document.createElement('div');d.className='card';d.style.color=ok?'var(--ok)':'var(--err)';if(ok)d.style.borderColor='var(--ok)';d.textContent=m;app.prepend(d);setTimeout(()=>d.remove(),5000)}
+// notices float over the view (a long chat may be scrolled far from the top); errors red, confirmations green
+function alertBar(m,ok){const d=document.createElement('div');d.className='card toast'+(ok?' ok':'');d.textContent=m;document.body.appendChild(d);setTimeout(()=>d.remove(),5000)}
 // quick bar: special keys + slash commands → then show the screen (menus/pickers render there)
 let redraw=null;
 document.querySelectorAll('#quick [data-k]').forEach(b=>b.onclick=()=>{if(!cur)return;
