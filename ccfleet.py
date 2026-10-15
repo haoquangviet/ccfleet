@@ -1,7 +1,7 @@
-"""ccfleet — a session manager for Claude Code (Windows, stdlib + Pillow).
+"""ccfleet — a session manager for Claude Code (Windows + macOS, Linux experimental; stdlib + Pillow).
 
-Runs several Claude Code sessions, each in its own (minimized/hidden) console with Remote Control
-enabled, restarts them when they die or after a reboot, supports several Claude accounts (one
+Runs several Claude Code sessions, each in its own (minimized/hidden) console on Windows or its own
+detached tmux session on macOS/Linux (fleet_console picks the backend), with Remote Control enabled, restarts them when they die or after a reboot, supports several Claude accounts (one
 CLAUDE_CONFIG_DIR per account) and serves a web UI for phone/desktop.
 
 Data dir (config/state/logs): $CCFLEET_HOME (or --home), default ~/.ccfleet
@@ -64,7 +64,7 @@ DEFAULT_CONFIG = {
         "min_free_ram_gb": 1.5,
         "max_busy_sessions": 3,         # scheduled prompts wait while this many sessions are working
     },
-    "claude_exe": "",  # empty → auto-detect (npm global claude.exe, ~/.local/bin, then PATH)
+    "claude_exe": "",  # empty → auto-detect (npm global / ~/.local/bin / Homebrew, then PATH)
     "lang": "",        # "en" | "vi" for the CLI menu; empty → LANG env var, else English
     "accounts": {
         # "main" = default ~/.claude (config_dir null). Add more with: ccfleet account add <name>
@@ -73,7 +73,7 @@ DEFAULT_CONFIG = {
     "defaults": {
         "permission_mode": "bypassPermissions",
         "remote_control": True,
-        "window": "minimized",          # minimized | hidden | normal
+        "window": "minimized",          # minimized | hidden | normal (Windows; tmux sessions are always detached)
         "restart": "always",            # always | on-failure | never
         "effort": None,                 # low|medium|high|xhigh|max — lower = fewer tokens
         "model": None,
@@ -84,7 +84,8 @@ DEFAULT_CONFIG = {
                                 "hand multi-file reading to subagents, answer briefly.",
         "boot_prompt": None,            # sent once when (re)started after a reboot / supervisor start
         "extra_args": [],
-        # Resource caps per session (Job Object: claude + every child build/deploy process).
+        # Resource caps per session (Windows: Job Object over claude + every child build/deploy process;
+        # macOS/Linux: a RAM watchdog that restarts a session over mem_gb, cpu_pct only lowers priority).
         "mem_gb": 8,                    # job memory cap; allocations beyond it fail instead of freezing the host
         "cpu_pct": 50,                  # hard cap, % of the whole machine
     },
@@ -157,6 +158,13 @@ def load_config() -> dict:
 def claude_exe(cfg: dict) -> str:
     if cfg.get("claude_exe"):
         return cfg["claude_exe"]
+    if not fleet_console.IS_WIN:
+        # launchd/systemd start the supervisor with a bare PATH: look where the installers put claude
+        for c in (shutil.which("claude"), Path.home() / ".local/bin/claude", Path.home() / ".claude/local/claude",
+                  "/opt/homebrew/bin/claude", "/usr/local/bin/claude", Path.home() / ".npm-global/bin/claude"):
+            if c and Path(c).is_file():
+                return str(c)
+        sys.exit("claude executable not found — install Claude Code, or set claude_exe in config.json")
     npm = Path(os.environ.get("APPDATA", "")) / "npm/node_modules/@anthropic-ai/claude-code/bin/claude.exe"
     for c in (npm, Path.home() / ".local/bin/claude.exe"):
         if c.exists():
@@ -465,6 +473,11 @@ def tick(boot: bool) -> None:
         if not s.get("enabled", True) or st.get("stopped"):
             continue
         if pid_alive(st.get("pid")):
+            if (rss := fleet_limits.over_cap(st["pid"], session_opt(cfg, s, "mem_gb"))) is not None:
+                # macOS/Linux RAM watchdog (Windows Job Objects enforce the cap themselves)
+                log(f"{name}: process tree uses {rss:.1f} GB > mem_gb {session_opt(cfg, s, 'mem_gb')} - killing it")
+                kill_tree(st["pid"])
+                continue
             watch_screen(s, st)
             continue
         if st.get("pid") and st.get("exit_logged") != st["pid"]:
@@ -552,7 +565,13 @@ def web_conf(cfg: dict | None = None) -> dict:
 
 
 def cmd_run(_a) -> None:
+    try:
+        backend = fleet_console.check()  # macOS/Linux: tmux must be installed
+    except RuntimeError as e:
+        log(f"cannot run sessions: {e}")
+        sys.exit(str(e))
     acquire_lock()
+    log(f"session backend: {backend}")
     log(f"supervisor up (pid {os.getpid()}), home={HOME}")
     try:
         install_skill(load_config())  # every account gets the current ccfleet-sessions skill
@@ -633,6 +652,7 @@ def set_stopped(name: str, stopped: bool) -> dict:
     st.pop("paused_until", None)
     if not stopped:
         st["restarts"] = []
+        st["force_start"] = True  # a manual start beats restart "never" / "on-failure" (as on the web)
     save_json(STATE, state)
     return st
 
@@ -814,7 +834,7 @@ def create_project(cfg: dict, name: str, path: str, account: str = "main", clone
         if p.exists() and any(p.iterdir()):
             raise ValueError("the target folder is not empty")
         if not shutil.which("git"):
-            raise ValueError("git is not installed on this machine — install Git for Windows, or leave the clone URL empty")
+            raise ValueError("git is not installed on this machine — install Git (Windows: Git for Windows; macOS: xcode-select --install), or leave the clone URL empty")
         r = subprocess.run(["git", "clone", clone_url, str(p)], capture_output=True, text=True, timeout=600)
         if r.returncode:
             raise ValueError(f"git clone failed: {r.stderr.strip()[-300:]}")
@@ -958,6 +978,9 @@ def cmd_account(a) -> None:
         print(f"account '{a.name}' → {d}. Opening a console to sign in…")
         a.action = "login"
     if a.action == "login":
+        if not fleet_console.IS_WIN:  # no new console window to open: sign in right here
+            subprocess.call([claude_exe(cfg), "auth", "login"], env=account_env(cfg, a.name))
+            return
         subprocess.Popen([claude_exe(cfg), "auth", "login"], env=account_env(cfg, a.name),
                          creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
         print("finish the sign-in in the new console window (browser link)")
@@ -969,9 +992,29 @@ def cmd_account(a) -> None:
         print(f"removed account '{a.name}' (config dir left on disk)")
 
 
+def posix_shim() -> str:
+    """The `ccfleet` shell command for macOS/Linux: this machine's CCFLEET_HOME + python + ccfleet.py."""
+    import shlex
+    return ("#!/bin/sh\n# ccfleet shortcut (written by `ccfleet shortcut`)\n"
+            f"export CCFLEET_HOME={shlex.quote(str(HOME))} PYTHONIOENCODING=utf-8\n"
+            f"exec {shlex.quote(sys.executable)} {shlex.quote(str(Path(__file__).resolve()))} \"$@\"\n")
+
+
 def cmd_shortcut(_a) -> None:
     """Create a short `ccfleet` command: ccfleet.cmd (+ a Git Bash twin) in %USERPROFILE%\\bin, added
-    to the user PATH. It hard-codes this machine's CCFLEET_HOME + python + ccfleet.py path."""
+    to the user PATH (Windows) / ~/.local/bin/ccfleet (macOS, Linux). It hard-codes this machine's
+    CCFLEET_HOME + python + ccfleet.py path."""
+    if not fleet_console.IS_WIN:
+        bindir = Path.home() / ".local" / "bin"
+        bindir.mkdir(parents=True, exist_ok=True)
+        f = bindir / "ccfleet"
+        f.write_text(posix_shim(), encoding="utf-8")
+        f.chmod(0o755)
+        on_path = any(Path(d).expanduser() == bindir for d in os.environ.get("PATH", "").split(os.pathsep) if d)
+        print(f"ready: {f} — run:  ccfleet status" + ("" if on_path else
+              f"\n{bindir} is not on your PATH — add it:  echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.zshrc"
+              "  (bash: ~/.bashrc), then open a new terminal"))
+        return
     py = sys.executable
     script = str(Path(__file__).resolve())
     bindir = Path(os.environ.get("USERPROFILE") or Path.home()) / "bin"
@@ -1021,8 +1064,12 @@ def cmd_skill_install(_a) -> None:
 
 def cmd_install(_a) -> None:
     """Register the boot task so the supervisor starts at boot and stays alive."""
-    fleet_console.install_boot(str(HOME), sys.executable, str(Path(__file__).resolve()))
-    print(t("cli.installed"))
+    try:
+        fleet_console.check()
+    except RuntimeError as e:
+        sys.exit(str(e))
+    what = fleet_console.install_boot(str(HOME), sys.executable, str(Path(__file__).resolve()))
+    print(t("cli.installed") + (f"\n  {what}" if what else ""))
 
 
 def cmd_uninstall(_a) -> None:
@@ -1046,6 +1093,9 @@ def cmd_demo(a) -> None:
 
 
 def main() -> None:
+    if sys.version_info < (3, 10):
+        sys.exit(f"ccfleet needs Python 3.10 or newer (this is {sys.version.split()[0]}) — "
+                 "macOS: brew install python, then run ccfleet with that python3")
     for stream in (sys.stdout, sys.stderr):  # pipes default to the ANSI code page on Windows
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -1119,8 +1169,9 @@ def main() -> None:
     p.add_argument("name", nargs="?")
     p.add_argument("--dir", help="config dir for 'add' (default ~/.claude-<name>)")
     p.set_defaults(fn=cmd_account)
-    sub.add_parser("install", help="register the boot scheduled task").set_defaults(fn=cmd_install)
-    sub.add_parser("uninstall", help="remove the scheduled task").set_defaults(fn=cmd_uninstall)
+    sub.add_parser("install", help="start the supervisor at boot/login and keep it alive (Windows scheduled task, "
+                   "macOS LaunchAgent, Linux systemd user unit)").set_defaults(fn=cmd_install)
+    sub.add_parser("uninstall", help="remove the boot task / LaunchAgent / unit").set_defaults(fn=cmd_uninstall)
     sub.add_parser("shortcut", help="create a short `ccfleet` command on PATH").set_defaults(fn=cmd_shortcut)
     sub.add_parser("skill-install", help="install the bundled skill into every account").set_defaults(fn=cmd_skill_install)
     sub.add_parser("menu", help="interactive session manager (same as plain `ccfleet`)").set_defaults(fn=None)

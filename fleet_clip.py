@@ -2,8 +2,10 @@
 
 An image is saved as PNG under <CCFLEET_HOME>/paste/ and its path goes into the prompt — Claude Code
 reads an image when a prompt names its file (the PreToolUse hook shrinks big ones). Copied files
-(Explorer "Copy") come in as their paths. Images via Pillow's ImageGrab; text via PowerShell
-Get-Clipboard. Must run in the user's desktop session (not the supervisor's).
+(Explorer / Finder "Copy") come in as their paths. Images via Pillow's ImageGrab (Windows; macOS
+through osascript; Linux needs wl-paste or xclip); text via PowerShell Get-Clipboard (Windows),
+pbpaste (macOS), wl-paste / xclip / xsel (Linux). Must run in the user's desktop session (not the
+supervisor's): over SSH, or without a clipboard tool, it degrades to "clipboard is empty".
 Also used by the web composer: an image pasted there is stored by save_bytes().
 """
 from __future__ import annotations
@@ -19,17 +21,26 @@ KEEP_DAYS = 14
 MAX_IMAGE = 10 * 1024 * 1024
 
 
+TEXT_CMDS = {
+    "darwin": [["pbpaste"]],
+    "linux": [["wl-paste", "--no-newline"], ["xclip", "-selection", "clipboard", "-o"], ["xsel", "-b", "-o"]],
+}
+
+
 def text() -> str:
-    try:
-        if sys.platform == "win32":
-            r = subprocess.run(["powershell", "-NoProfile", "-STA", "-Command",
-                                "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Clipboard -Raw"],
-                               capture_output=True, encoding="utf-8", errors="replace", timeout=10)
-        else:
-            r = subprocess.run(["pbpaste"], capture_output=True, encoding="utf-8", errors="replace", timeout=10)
-        return (r.stdout or "").replace("\r\n", "\n").strip()
-    except (OSError, subprocess.SubprocessError):
-        return ""
+    if sys.platform == "win32":
+        cmds = [["powershell", "-NoProfile", "-STA", "-Command",
+                 "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Clipboard -Raw"]]
+    else:
+        cmds = TEXT_CMDS.get(sys.platform, TEXT_CMDS["linux"])
+    for cmd in cmds:
+        try:
+            r = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            continue  # tool not installed / no display: try the next one
+        if r.returncode == 0:
+            return (r.stdout or "").replace("\r\n", "\n").strip()
+    return ""
 
 
 def _cleanup() -> None:

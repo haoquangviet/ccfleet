@@ -29,12 +29,33 @@ def signed_in(acc: dict) -> bool:
     """This account has an OAuth login in its config dir (what `claude auth login` writes)."""
     f = config_dir_of(acc) / ".credentials.json"
     if not f.exists() and sys.platform == "darwin":
-        return True  # macOS may keep it in the Keychain instead — can't tell, don't block
+        return _in_keychain(acc)  # macOS keeps the login in the Keychain when one is unlocked
     try:
         cred = json.loads(f.read_text(encoding="utf-8")).get("claudeAiOauth") or {}
     except (OSError, ValueError):
         return False
     return bool(cred.get("refreshToken") or cred.get("accessToken"))
+
+
+def keychain_service(acc: dict) -> str:
+    """Claude Code's macOS Keychain item name: the default config dir uses 'Claude Code-credentials',
+    a CLAUDE_CONFIG_DIR adds the first 8 hex chars of the dir's sha256."""
+    import hashlib
+    if not acc.get("config_dir"):
+        return "Claude Code-credentials"
+    return "Claude Code-credentials-" + hashlib.sha256(str(acc["config_dir"]).encode()).hexdigest()[:8]
+
+
+def _in_keychain(acc: dict) -> bool:
+    """Whether the Keychain HAS a login item for this account. Looks at the item's attributes only —
+    never the secret, so no access prompt. `security` missing / failing → can't tell → True."""
+    import subprocess
+    try:
+        r = subprocess.run(["security", "find-generic-password", "-s", keychain_service(acc)],
+                           capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return True
+    return r.returncode != 44  # 44 = item not found; other errors (locked keychain…) → can't tell
 
 
 def has_transcript(acc: dict, session_id: str) -> bool:

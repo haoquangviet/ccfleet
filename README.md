@@ -1,12 +1,13 @@
 # ccfleet
 
-**A session manager for Claude Code — run and manage multiple Claude Code sessions on Windows, with a mobile web UI.**
+**A session manager for Claude Code — run and manage multiple Claude Code sessions on Windows and macOS, with a mobile web UI.**
 
 Tiếng Việt: [README.vi.md](README.vi.md)
 
 **ccfleet** is a small supervisor and session manager for
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) on Windows. It runs **multiple Claude Code
-sessions** at once, each in its own console with Remote Control turned on. It restarts sessions when
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) on **Windows and macOS** (Linux experimental).
+It runs **multiple Claude Code sessions** at once, each in its own console (Windows) or its own
+detached tmux session (macOS / Linux) with Remote Control turned on. It restarts sessions when
 they die (auto-restart with backoff) and resumes the same conversation after a reboot. You can drive
 everything from a terminal menu or from a **web UI** that works on your **phone** and on the desktop.
 It also handles **multiple Claude accounts**: you can sign them in from the web, pick an account for
@@ -23,14 +24,14 @@ It is plain Python (standard library plus Pillow) and needs no VS Code.
 | Pain point | With ccfleet |
 |---|---|
 | Remote control from the Claude app only continues a session that is already open; you cannot start a new one from your phone | Create, start, stop and restart any session from the web UI, on any project, from your phone |
-| Claude Code in a terminal or in VS Code means one heavy window per session that you have to keep open and babysit | Sessions run in the background, each in its own console, with per-session RAM/CPU caps; no IDE needed |
+| Claude Code in a terminal or in VS Code means one heavy window per session that you have to keep open and babysit | Sessions run in the background, each in its own console or tmux session, with per-session RAM caps; no IDE needed |
 | A crash, an update or a reboot kills the session and the conversation is gone until you reopen it by hand | Auto-restart with backoff and `--resume` of the same conversation, also after a reboot |
 | Several Claude accounts mean logging in and out in each terminal | Sign accounts in from the web, see 5h / 7-day usage, choose the account per session |
 
 ## Features
 
 **Supervisor (`ccfleet run`)**
-- Runs each session in its own (minimized or hidden) console with `claude --remote-control <name>`, so you can also open it from claude.ai or the Claude mobile app.
+- Runs each session with `claude --remote-control <name>`, so you can also open it from claude.ai or the Claude mobile app: on Windows in its own (minimized or hidden) console, on macOS / Linux in a detached tmux session on ccfleet's own tmux server (`tmux -L ccfleet`, never your own tmux sessions). Watch one live with `tmux -L ccfleet attach -t ccfleet_<name>`.
 - Restarts a session automatically when it exits. Restart policy is `always`, `on-failure` or `never`, with a backoff: 5 restarts in 10 minutes pauses the session for 10 minutes.
 - Restarts use `--resume <session-id>`, so a session continues the same conversation after a crash or reboot.
 - Never starts a second copy of a session that is already open elsewhere, for example in VS Code or a terminal. `takeover` hands that session over to the supervisor.
@@ -38,7 +39,8 @@ It is plain Python (standard library plus Pillow) and needs no VS Code.
 - Durable schedules: sends a prompt at fixed minutes or every N minutes, only while the session is idle. Schedules survive restarts, unlike in-session cron.
 - Runs `claude update` every night inside a configurable time window, only when no session is working. Idle sessions then move onto the new binary one at a time.
 - Host RAM guard: when free RAM is below a threshold, no new launches start and scheduled prompts wait.
-- Per-session RAM and CPU caps through **Windows Job Objects**. Child processes (builds, test runners) inherit the caps, so one runaway build can't freeze the machine.
+- Per-session RAM and CPU caps through **Windows Job Objects**. Child processes (builds, test runners) inherit the caps, so one runaway build can't freeze the machine. On macOS / Linux a **RAM watchdog** sums the memory of each session's process tree every 10 s and restarts a session that goes over its cap (see [Limitations](#limitations)).
+- Starts at boot / login and is kept alive: a scheduled task on Windows, a launchd **LaunchAgent** on macOS, a systemd user unit on Linux (`ccfleet install`).
 
 **Terminal**
 - Plain `ccfleet` opens an interactive menu: a numbered session list, then one key per action (peek, send, start, stop, restart, keys).
@@ -63,12 +65,15 @@ It is plain Python (standard library plus Pillow) and needs no VS Code.
 
 ## Requirements
 
-- Windows 10/11 or Windows Server
-- Python 3.11+ and [Pillow](https://pypi.org/project/pillow/)
-- Claude Code CLI installed (`claude` on PATH or the npm global install) and signed in
+- **Windows** 10/11 or Windows Server, **or macOS** (Apple silicon or Intel). Linux works through the same tmux backend but is **experimental** (less tested).
+- Python **3.10+** and [Pillow](https://pypi.org/project/pillow/). On macOS the system `python3` is often 3.9, so use Homebrew's (`brew install python`).
+- macOS / Linux: **tmux 3.0+** (`brew install tmux`, `sudo apt install tmux`). ccfleet tells you if it is missing.
+- Claude Code CLI installed (`claude` on PATH, the native installer's `~/.local/bin/claude`, Homebrew or the npm global install) and signed in
 - A Claude subscription (Pro / Max) for each account you add
 
 ## Quick start
+
+### Windows
 
 ```powershell
 git clone https://github.com/<you>/ccfleet.git
@@ -87,6 +92,31 @@ python -m venv .venv
 # optional: a short `ccfleet` command on your PATH
 .venv\Scripts\python ccfleet.py shortcut
 ```
+
+### macOS
+
+```sh
+brew install tmux python
+git clone https://github.com/<you>/ccfleet.git
+cd ccfleet
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt     # Pillow
+
+# ./ccfleet is a small shell shim: it uses .venv when present, else the first python3 >= 3.10
+./ccfleet add my-app --cwd ~/Projects/my-app
+
+# run the supervisor in the foreground...
+./ccfleet run
+# ...or install it as a LaunchAgent (com.ccfleet.supervisor): starts at login, kept alive
+./ccfleet install
+
+# optional: a `ccfleet` command on your PATH (writes ~/.local/bin/ccfleet)
+./ccfleet shortcut          # or: ln -s "$PWD/ccfleet" ~/.local/bin/ccfleet
+```
+
+`ccfleet install` writes `~/Library/LaunchAgents/com.ccfleet.supervisor.plist` (`RunAtLoad`, `KeepAlive`, logs in `~/.ccfleet/launchd.*.log`) and loads it with `launchctl bootstrap gui/$UID`. A LaunchAgent runs while you are logged in; on a headless Mac (e.g. a Mac mini in a closet) turn on automatic login. `ccfleet uninstall` unloads and deletes it; running sessions keep going.
+
+On Linux (experimental) the same steps work with your package manager's `tmux` and `python3`; `ccfleet install` writes a systemd user unit (`~/.config/systemd/user/ccfleet.service`) — run `sudo loginctl enable-linger $USER` to keep it running while logged out.
 
 Turn on the web UI:
 
@@ -116,7 +146,7 @@ Demo mode serves the web UI with **fake data**: several sessions (one busy, one 
 | Command | What it does |
 |---|---|
 | `ccfleet` / `ccfleet menu` | Interactive session manager (for humans; waits on stdin) |
-| `ccfleet run` | Supervisor loop (what the scheduled task runs) |
+| `ccfleet run` | Supervisor loop (what the scheduled task / LaunchAgent runs) |
 | `ccfleet status` | Supervisor + every session: running/busy/stopped, pid, session id, Remote Control URL |
 | `ccfleet list` | Configured sessions |
 | `ccfleet add <name> --cwd <dir> [--account a] [--session-id id] [--effort …] [--model …] [--boot-prompt …]` | Add a session (or adopt an existing conversation by id) |
@@ -132,14 +162,14 @@ Demo mode serves the web UI with **fake data**: several sessions (one busy, one 
 | `ccfleet account list \| add <name> \| login <name> \| remove <name>` | Manage Claude accounts (one `CLAUDE_CONFIG_DIR` each) |
 | `ccfleet web open \| setup \| enable \| disable` | Web UI: local login link, password + TOTP setup, on/off |
 | `ccfleet web port [N]` | Print the web port, or set it to N |
-| `ccfleet install` / `ccfleet uninstall` | Register / remove the `ccfleet-supervisor` scheduled task |
-| `ccfleet shortcut` | Create a `ccfleet` command (`ccfleet.cmd` + a Git Bash twin) on your PATH |
+| `ccfleet install` / `ccfleet uninstall` | Start the supervisor at boot / login and keep it alive, or remove that: Windows scheduled task `ccfleet-supervisor`, macOS LaunchAgent `com.ccfleet.supervisor`, Linux systemd user unit `ccfleet.service` |
+| `ccfleet shortcut` | Create a `ccfleet` command on your PATH (Windows: `ccfleet.cmd` + a Git Bash twin; macOS / Linux: `~/.local/bin/ccfleet`) |
 | `ccfleet skill-install` | Install the bundled `ccfleet-sessions` skill into every account |
 | `ccfleet demo [--port N] [--lang en\|vi]` | Demo web UI with fake data (loopback only) |
 
 ## Configuration
 
-Everything lives in the data dir: `%CCFLEET_HOME%`, default `~/.ccfleet`.
+Everything lives in the data dir: `$CCFLEET_HOME` (`%CCFLEET_HOME%` on Windows), default `~/.ccfleet`.
 
 | File | Contents |
 |---|---|
@@ -186,7 +216,9 @@ Example `config.json`:
 - `host.min_free_ram_gb`: below this, nothing new launches and scheduled prompts wait.
 - `host.max_busy_sessions`: scheduled prompts wait while this many sessions are working.
 - Any `defaults` key can be overridden per session.
-- `config_dir: null` means the default `~/.claude`. Each other account has its own `CLAUDE_CONFIG_DIR`.
+- `config_dir: null` means the default `~/.claude`. Each other account has its own `CLAUDE_CONFIG_DIR` (e.g. `/Users/me/.claude-work` on macOS).
+- `window` only applies on Windows; tmux sessions are always detached.
+- `mem_gb` / `cpu_pct`: on Windows a hard Job Object cap. On macOS / Linux `mem_gb` is a watchdog (restart when the session's process tree goes over it) and `cpu_pct` < 100 only lowers the session's priority (`nice 10`).
 - `auto_update.window` is the hour range (local time) in which `claude update` may run.
 
 ## Language
@@ -213,6 +245,8 @@ Image tokens grow with pixel count, roughly width × height / 750. A phone scree
 }
 ```
 
+On macOS / Linux the command is `/path/to/ccfleet/.venv/bin/python /path/to/ccfleet/image_shrink_hook.py`.
+
 Environment knobs: `CCFLEET_IMG_MAX_MP` (default `0.75` megapixels), `CCFLEET_IMG_MAX_EDGE` (default `1568` px), `CCFLEET_IMG_CACHE` (cache dir).
 
 ## Security
@@ -237,19 +271,23 @@ ccfleet always listens on loopback only. To reach it from your phone or another 
 - **Tailscale** (`tailscale serve`): private to the devices on your tailnet.
 - **Reverse proxy with TLS**: Caddy (automatic HTTPS) or nginx + certbot (see [`deploy/nginx.example.conf`](deploy/nginx.example.conf)).
 
-Step-by-step guide, including proxy headers, `web.base_url`, running as a Windows service and a security checklist: **[docs/remote-access.md](docs/remote-access.md)** (Tiếng Việt: [docs/remote-access.vi.md](docs/remote-access.vi.md)).
+Step-by-step guide, including proxy headers, `web.base_url`, running the tunnel as a Windows or macOS service and a security checklist: **[docs/remote-access.md](docs/remote-access.md)** (Tiếng Việt: [docs/remote-access.vi.md](docs/remote-access.vi.md)).
 
 ## How it works
 
-- **Console attach:** each session is a real `claude` process in its own Windows console. The supervisor attaches to that console to read the screen (`peek`) and to inject key events (`type`/`keys`).
+- **Session backends** (`fleet_console.py` picks one; the supervisor, menu and web UI are the same everywhere):
+  - **Windows — console attach:** each session is a real `claude` process in its own Windows console. The supervisor attaches to that console to read the screen (`peek`) and to inject key events (`type`/`keys`).
+  - **macOS / Linux — tmux:** each session is a real `claude` process in a detached tmux session on ccfleet's private server (`tmux -L ccfleet`). `peek` is `capture-pane`, `type` is `send-keys -l` (or one bracketed paste for long / multi-line prompts), keys are tmux key names (Shift+Tab = `BTab`).
 - **Transcripts:** the chat view and file pane read Claude Code's own transcripts in `<config dir>/projects/*/<session-id>.jsonl`. Only the tail of each file is read, so large histories stay cheap.
 - **Enter is sent separately.** Claude Code treats fast input as a paste and swallows an Enter that arrives inside it. Prompt text is typed first, then Enter follows after a short pause.
 - **Busy detection** uses the spinner and status line on screen. Schedules and messages wait for an idle session, so they never interrupt a running turn.
 
 ## Limitations
 
-- The console backend is **Windows-only** (Win32 console APIs and Job Objects).
-- When the supervisor runs as a scheduled task (S4U), it runs in **session 0**. A shell in your RDP or desktop session can't attach to those consoles, so `peek` and `send` fall back to the local web API.
+- **macOS / Linux resource caps are best effort.** There are no Job Objects: the RAM cap is a watchdog that checks every 10 s (a fast spike can still hit the machine before the session is restarted) and there is no hard CPU cap, only a lower priority.
+- **macOS:** the LaunchAgent runs while you are logged in (use automatic login on a headless Mac). When Claude Code keeps an account's login in the macOS Keychain instead of `.credentials.json`, ccfleet can tell the account is signed in but can't show its 5h / 7d usage. The clipboard (`--clip`) works in your desktop session (`pbpaste`, images through Pillow), not over SSH.
+- **Linux is experimental:** same tmux backend; clipboard needs `wl-paste` or `xclip`.
+- Windows: when the supervisor runs as a scheduled task (S4U), it runs in **session 0**. A shell in your RDP or desktop session can't attach to those consoles, so `peek` and `send` fall back to the local web API.
 - Claude Code draws long pickers (e.g. `/model`) in a small scrolling viewport. The web UI shows only what is drawn and offers ↑/↓ to scroll.
 - Usage numbers come from the account's OAuth token and are unavailable while that token is expired.
 

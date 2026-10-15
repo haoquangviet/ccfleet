@@ -18,7 +18,7 @@ The placeholders below are `fleet.example.com` (your hostname) and `<port>` (you
 
 The tunnel makes an outbound connection to Cloudflare. You open no inbound ports and don't touch your router.
 
-1. Install `cloudflared` (for example `winget install --id Cloudflare.cloudflared`).
+1. Install `cloudflared` (Windows: `winget install --id Cloudflare.cloudflared`; macOS: `brew install cloudflared`).
 2. Sign in and create the tunnel:
 
    ```powershell
@@ -27,7 +27,8 @@ The tunnel makes an outbound connection to Cloudflare. You open no inbound ports
    cloudflared tunnel route dns ccfleet fleet.example.com
    ```
 
-3. Create `%USERPROFILE%\.cloudflared\config.yml`:
+3. Create `%USERPROFILE%\.cloudflared\config.yml` (macOS / Linux: `~/.cloudflared/config.yml`, with
+   `credentials-file: /Users/<you>/.cloudflared/<tunnel-id>.json`):
 
    ```yaml
    tunnel: <tunnel-id>
@@ -38,11 +39,17 @@ The tunnel makes an outbound connection to Cloudflare. You open no inbound ports
      - service: http_status:404
    ```
 
-4. Run it as a Windows service:
+4. Run it as a service:
 
    ```powershell
-   cloudflared service install
+   cloudflared service install          # Windows: a Windows service
    ```
+
+   On macOS, `sudo cloudflared service install` installs a launchd service that reads
+   `/etc/cloudflared/config.yml` (copy your `config.yml` and the tunnel's `.json` there and fix
+   `credentials-file`). Without sudo, `cloudflared service install` installs a LaunchAgent
+   (`~/Library/LaunchAgents/com.cloudflare.cloudflared.plist`) that runs while you are logged in,
+   like ccfleet's own LaunchAgent.
 
 5. Optional but recommended: add a **Cloudflare Access** (Zero Trust) application for `fleet.example.com`.
    Visitors must then pass Cloudflare's login (email one-time code, SSO…) before they even see the ccfleet login page.
@@ -64,6 +71,9 @@ tailscale serve --bg http://127.0.0.1:<port>
 ```
 
 The UI is then reachable at `https://<machine>.<tailnet>.ts.net` from your tailnet devices only. It is not public.
+`--bg` keeps the setting across reboots as long as Tailscale itself starts at boot (on Windows it is a service;
+on macOS use the Tailscale app with "Launch at login", or `brew install tailscale` and `sudo brew services start tailscale`).
+On macOS the CLI of the App Store / standalone app lives at `/Applications/Tailscale.app/Contents/MacOS/Tailscale`.
 
 ## C) Reverse proxy with TLS
 
@@ -88,11 +98,20 @@ Whatever proxy you use, it must:
 - set `proxy_read_timeout` (or equivalent) to **≥ 120 s**, because the chat view long-polls;
 - allow request bodies up to **100 MB** (`client_max_body_size 100m`) for file uploads.
 
-## D) Running it as a Windows service
+## D) Running it as a service
 
+**Windows**
 - **cloudflared:** `cloudflared service install` (see A).
 - **Caddy / nginx:** wrap them with [NSSM](https://nssm.cc/), or register a scheduled task that runs at startup.
 - **ccfleet** itself: `ccfleet install` registers the `ccfleet-supervisor` scheduled task.
+
+**macOS**
+- **cloudflared:** `sudo cloudflared service install` (system-wide, see A), or `brew services start cloudflared` (runs while you are logged in).
+- **Tailscale:** the app with "Launch at login", or `sudo brew services start tailscale`.
+- **Caddy / nginx:** `brew services start caddy` / `brew services start nginx` (Homebrew writes the launchd plist).
+- **ccfleet** itself: `ccfleet install` loads the `com.ccfleet.supervisor` LaunchAgent. It runs while you are logged in, so on a headless Mac turn on automatic login (System Settings → Users & Groups) and keep the Mac from sleeping (`sudo pmset -a sleep 0`, or Energy settings → "Prevent automatic sleeping").
+
+**Linux (experimental):** `ccfleet install` writes a systemd user unit; `sudo loginctl enable-linger $USER` keeps it running while logged out. cloudflared / tailscale / caddy ship their own systemd units.
 
 ## Behind a proxy: what ccfleet does
 

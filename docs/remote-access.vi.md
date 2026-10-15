@@ -17,7 +17,7 @@ Trong hướng dẫn, `fleet.example.com` là tên miền của bạn, còn `<po
 
 Tunnel tự kết nối ra Cloudflare, nên không phải mở cổng vào nào và không cần cấu hình router.
 
-1. Cài `cloudflared`, ví dụ `winget install --id Cloudflare.cloudflared`.
+1. Cài `cloudflared` (Windows: `winget install --id Cloudflare.cloudflared`; macOS: `brew install cloudflared`).
 2. Đăng nhập và tạo tunnel:
 
    ```powershell
@@ -26,7 +26,8 @@ Tunnel tự kết nối ra Cloudflare, nên không phải mở cổng vào nào 
    cloudflared tunnel route dns ccfleet fleet.example.com
    ```
 
-3. Tạo file `%USERPROFILE%\.cloudflared\config.yml`:
+3. Tạo file `%USERPROFILE%\.cloudflared\config.yml` (macOS / Linux: `~/.cloudflared/config.yml`, với
+   `credentials-file: /Users/<you>/.cloudflared/<tunnel-id>.json`):
 
    ```yaml
    tunnel: <tunnel-id>
@@ -37,11 +38,16 @@ Tunnel tự kết nối ra Cloudflare, nên không phải mở cổng vào nào 
      - service: http_status:404
    ```
 
-4. Cài thành Windows service:
+4. Cài thành service:
 
    ```powershell
-   cloudflared service install
+   cloudflared service install          # Windows: Windows service
    ```
+
+   Trên macOS, `sudo cloudflared service install` cài một launchd service đọc `/etc/cloudflared/config.yml`
+   (chép `config.yml` và file `.json` của tunnel vào đó, sửa lại `credentials-file`). Không dùng sudo thì
+   `cloudflared service install` cài một LaunchAgent (`~/Library/LaunchAgents/com.cloudflare.cloudflared.plist`),
+   chỉ chạy khi bạn đã đăng nhập, giống LaunchAgent của ccfleet.
 
 5. Tuỳ chọn, nhưng nên làm: thêm một ứng dụng **Cloudflare Access** (Zero Trust) cho `fleet.example.com`. Khi đó người
    truy cập phải qua bước đăng nhập của Cloudflare (mã gửi qua email, SSO…) trước khi thấy trang đăng nhập của ccfleet.
@@ -63,6 +69,9 @@ tailscale serve --bg http://127.0.0.1:<port>
 ```
 
 Sau đó mở `https://<máy>.<tailnet>.ts.net`. Chỉ các thiết bị trong tailnet của bạn truy cập được, địa chỉ này không công khai.
+`--bg` giữ cấu hình qua các lần khởi động lại, miễn là Tailscale tự chạy lúc khởi động (Windows: là service; macOS: bật
+"Launch at login" trong app Tailscale, hoặc `brew install tailscale` rồi `sudo brew services start tailscale`).
+Trên macOS, CLI của app nằm ở `/Applications/Tailscale.app/Contents/MacOS/Tailscale`.
 
 ## C) Reverse proxy có TLS
 
@@ -87,11 +96,20 @@ Dùng proxy nào cũng phải:
 - đặt `proxy_read_timeout` (hoặc tương đương) **≥ 120 giây**, vì màn hình hội thoại dùng long-poll;
 - cho phép body tới **100 MB** (`client_max_body_size 100m`) để tải tệp lên.
 
-## D) Chạy thành Windows service
+## D) Chạy thành service
 
+**Windows**
 - **cloudflared:** `cloudflared service install` (xem mục A).
 - **Caddy / nginx:** bọc bằng [NSSM](https://nssm.cc/), hoặc tạo scheduled task chạy lúc khởi động máy.
 - **ccfleet:** `ccfleet install` tạo scheduled task `ccfleet-supervisor`.
+
+**macOS**
+- **cloudflared:** `sudo cloudflared service install` (toàn hệ thống, xem mục A), hoặc `brew services start cloudflared` (chạy khi đã đăng nhập).
+- **Tailscale:** app với "Launch at login", hoặc `sudo brew services start tailscale`.
+- **Caddy / nginx:** `brew services start caddy` / `brew services start nginx` (Homebrew tự viết plist launchd).
+- **ccfleet:** `ccfleet install` nạp LaunchAgent `com.ccfleet.supervisor`. Nó chạy khi bạn đã đăng nhập, nên với Mac không màn hình hãy bật tự đăng nhập (System Settings → Users & Groups) và không cho máy ngủ (`sudo pmset -a sleep 0`, hoặc Energy → "Prevent automatic sleeping").
+
+**Linux (thử nghiệm):** `ccfleet install` ghi systemd user unit; `sudo loginctl enable-linger $USER` để nó chạy cả khi đã đăng xuất. cloudflared / tailscale / caddy có sẵn systemd unit riêng.
 
 ## ccfleet làm gì khi đứng sau proxy
 

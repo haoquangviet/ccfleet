@@ -1,11 +1,12 @@
 # ccfleet
 
-**Trình quản lý phiên cho Claude Code — chạy và quản lý nhiều phiên Claude Code trên Windows, có giao diện web dùng được trên điện thoại.**
+**Trình quản lý phiên cho Claude Code — chạy và quản lý nhiều phiên Claude Code trên Windows và macOS, có giao diện web dùng được trên điện thoại.**
 
 English: [README.md](README.md)
 
-**ccfleet** là một supervisor nhỏ viết bằng Python (thư viện chuẩn + Pillow) và không cần VS Code. Nó chạy nhiều phiên
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) cùng lúc, mỗi phiên trong một cửa sổ console riêng, có bật
+**ccfleet** là một supervisor nhỏ viết bằng Python (thư viện chuẩn + Pillow) và không cần VS Code, chạy trên **Windows và
+macOS** (Linux đang thử nghiệm). Nó chạy nhiều phiên [Claude Code](https://docs.anthropic.com/en/docs/claude-code) cùng lúc,
+mỗi phiên trong một cửa sổ console riêng (Windows) hoặc một phiên tmux chạy nền riêng (macOS / Linux), có bật
 Remote Control. Phiên nào thoát thì ccfleet tự mở lại, và sau khi máy khởi động lại vẫn tiếp tục đúng hội thoại cũ.
 Bạn điều khiển tất cả từ menu trong terminal hoặc từ giao diện web trên điện thoại và máy tính.
 ccfleet hỗ trợ nhiều tài khoản Claude: chọn tài khoản cho từng phiên và xem mức dùng của từng tài khoản.
@@ -17,20 +18,21 @@ ccfleet hỗ trợ nhiều tài khoản Claude: chọn tài khoản cho từng p
 | Vấn đề | Với ccfleet |
 |---|---|
 | Điều khiển từ xa qua app Claude chỉ tiếp tục được phiên đang mở, không tạo được phiên mới từ điện thoại | Tạo, bật, tắt, khởi động lại bất kỳ phiên nào, ở bất kỳ dự án nào, ngay từ điện thoại |
-| Chạy Claude Code bằng terminal hay VS Code thì mỗi phiên một cửa sổ, nặng máy, phải ngồi canh | Các phiên chạy nền, mỗi phiên một console riêng, có giới hạn RAM/CPU cho từng phiên; không cần IDE |
+| Chạy Claude Code bằng terminal hay VS Code thì mỗi phiên một cửa sổ, nặng máy, phải ngồi canh | Các phiên chạy nền, mỗi phiên một console hoặc phiên tmux riêng, có giới hạn RAM cho từng phiên; không cần IDE |
 | Phiên bị crash, cập nhật hay máy khởi động lại là mất phiên, phải tự mở lại | Tự khởi động lại và `--resume` đúng hội thoại cũ, kể cả sau khi máy khởi động lại |
 | Nhiều tài khoản Claude thì phải đăng nhập/đăng xuất trong từng terminal | Đăng nhập tài khoản ngay trên web, xem mức dùng 5h / 7 ngày, chọn tài khoản cho từng phiên |
 
 ## Tính năng
 
 - **Supervisor**
-  - Mỗi phiên chạy trong console riêng với `--remote-control`.
+  - Mỗi phiên chạy với `--remote-control`: trên Windows trong console riêng, trên macOS / Linux trong một phiên tmux chạy nền trên tmux server riêng của ccfleet (`tmux -L ccfleet`, không đụng tới các phiên tmux của bạn). Xem trực tiếp: `tmux -L ccfleet attach -t ccfleet_<tên>`.
   - Phiên thoát thì tự mở lại, có giãn cách khi lỗi lặp lại liên tục. Khi mở lại, phiên dùng `--resume` để tiếp tục đúng hội thoại.
   - Tự đồng ý hộp thoại "trust this folder".
   - Lịch gửi prompt định kỳ, chỉ gửi khi phiên rảnh.
   - Tự chạy `claude update` vào ban đêm.
   - Không mở phiên mới khi máy thiếu RAM.
-  - Giới hạn RAM/CPU cho từng phiên bằng Windows Job Objects (áp dụng cho cả tiến trình con).
+  - Giới hạn RAM/CPU cho từng phiên bằng Windows Job Objects (áp dụng cho cả tiến trình con). Trên macOS / Linux là **watchdog RAM**: cứ 10 giây cộng RAM của cả cây tiến trình, phiên nào vượt mức thì bị khởi động lại.
+  - Tự chạy lúc khởi động / đăng nhập và được giữ sống (`ccfleet install`): scheduled task trên Windows, **LaunchAgent** launchd trên macOS, systemd user unit trên Linux.
 - **Menu terminal:** gõ `ccfleet` để mở. Chọn số phiên rồi bấm một phím để xem màn hình, gửi prompt, chạy, dừng hoặc khởi động lại.
 - **Giao diện web (điện thoại + máy tính)**
   - Xem hội thoại trực tiếp; khi Claude đang làm sẽ hiện dòng trạng thái.
@@ -49,12 +51,15 @@ ccfleet hỗ trợ nhiều tài khoản Claude: chọn tài khoản cho từng p
 
 ## Yêu cầu
 
-- Windows 10/11 hoặc Windows Server
-- Python 3.11+ và Pillow
+- **Windows** 10/11 hoặc Windows Server, **hoặc macOS** (Apple silicon hay Intel). Linux dùng chung backend tmux nhưng còn **thử nghiệm**.
+- Python **3.10+** và Pillow. Trên macOS `python3` của hệ thống thường là 3.9, hãy dùng bản Homebrew (`brew install python`).
+- macOS / Linux: **tmux 3.0+** (`brew install tmux`, `sudo apt install tmux`). Thiếu tmux thì ccfleet sẽ báo.
 - Claude Code CLI đã cài và đã đăng nhập
 - Gói Claude (Pro / Max) cho mỗi tài khoản
 
 ## Bắt đầu nhanh
+
+### Windows
 
 ```powershell
 git clone https://github.com/<you>/ccfleet.git
@@ -67,6 +72,25 @@ python -m venv .venv
 .venv\Scripts\python ccfleet.py install    # hoặc: scheduled task ccfleet-supervisor, chạy lúc khởi động
 .venv\Scripts\python ccfleet.py shortcut   # tạo lệnh `ccfleet` trên PATH
 ```
+
+### macOS
+
+```sh
+brew install tmux python
+git clone https://github.com/<you>/ccfleet.git
+cd ccfleet
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt   # Pillow
+
+./ccfleet add my-app --cwd ~/Projects/my-app   # ./ccfleet dùng .venv nếu có, không thì python3 >= 3.10 đầu tiên
+./ccfleet run         # chạy supervisor (cửa sổ hiện tại)
+./ccfleet install     # hoặc: LaunchAgent com.ccfleet.supervisor, chạy khi đăng nhập và được giữ sống
+./ccfleet shortcut    # tạo ~/.local/bin/ccfleet (hoặc: ln -s "$PWD/ccfleet" ~/.local/bin/ccfleet)
+```
+
+`ccfleet install` ghi `~/Library/LaunchAgents/com.ccfleet.supervisor.plist` (`RunAtLoad`, `KeepAlive`, log ở `~/.ccfleet/launchd.*.log`) rồi nạp bằng `launchctl bootstrap gui/$UID`. LaunchAgent chạy khi bạn đã đăng nhập; Mac không màn hình thì bật tự đăng nhập. `ccfleet uninstall` gỡ nó, các phiên đang chạy vẫn chạy tiếp.
+
+Linux (thử nghiệm): làm tương tự với `tmux` và `python3` của trình quản lý gói; `ccfleet install` ghi systemd user unit `~/.config/systemd/user/ccfleet.service` (chạy `sudo loginctl enable-linger $USER` để nó chạy cả khi đã đăng xuất).
 
 Bật giao diện web:
 
@@ -110,7 +134,14 @@ ccfleet luôn chỉ nghe trên loopback. Muốn vào từ điện thoại hay t�
 - **Tailscale** (`tailscale serve`): chỉ các thiết bị trong tailnet của bạn truy cập được.
 - **Reverse proxy có TLS**: Caddy (tự lấy HTTPS) hoặc nginx + certbot (xem `deploy/nginx.example.conf`).
 
-Hướng dẫn chi tiết từng bước: **[docs/remote-access.vi.md](docs/remote-access.vi.md)** (English: [docs/remote-access.md](docs/remote-access.md)).
+Hướng dẫn chi tiết từng bước (kể cả chạy tunnel như service trên Windows / macOS): **[docs/remote-access.vi.md](docs/remote-access.vi.md)** (English: [docs/remote-access.md](docs/remote-access.md)).
+
+## Giới hạn
+
+- **Giới hạn tài nguyên trên macOS / Linux chỉ ở mức cố gắng:** không có Job Objects, giới hạn RAM là watchdog kiểm tra mỗi 10 giây (tăng vọt nhanh vẫn có thể ảnh hưởng máy trước khi phiên bị khởi động lại), không có giới hạn CPU cứng, chỉ hạ độ ưu tiên (`nice 10`).
+- **macOS:** LaunchAgent chạy khi bạn đã đăng nhập. Nếu Claude Code lưu đăng nhập của tài khoản trong Keychain thay vì `.credentials.json`, ccfleet biết tài khoản đã đăng nhập nhưng không hiện được mức dùng 5h / 7 ngày. Clipboard (`--clip`) chỉ dùng được trong phiên desktop của bạn, không qua SSH.
+- **Linux đang thử nghiệm:** cùng backend tmux; clipboard cần `wl-paste` hoặc `xclip`.
+- Windows: khi supervisor chạy bằng scheduled task (S4U) thì nó ở **session 0**; shell trong RDP / desktop không attach được vào các console đó, nên `peek` và `send` chuyển qua web API cục bộ.
 
 ## ccfleet Pro / Premium
 
