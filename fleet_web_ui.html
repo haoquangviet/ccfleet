@@ -89,6 +89,8 @@ a{color:var(--pri)}
 .hrow{flex-wrap:wrap;row-gap:6px}.hrow>b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:40px;max-width:32%}
 .hrow .accSel{max-width:120px}.hrow .hst{white-space:nowrap}.hst.ask,.sitem .when.ask{color:var(--warn);font-weight:600}
 .hbreak{display:none}
+.accGo:not([hidden])~.hst{display:none}   /* the switch button needs the room; state is back after the switch */
+@media (min-width:900px){.hrow{flex-wrap:nowrap}.hrow>b{flex:0 1 auto}.toast{top:64px}}
 /* phones: name · account · state on the first row, tabs + actions on the second — nothing may overflow */
 @media (max-width:899px){
   html,body{overflow-x:clip}
@@ -423,7 +425,7 @@ function railHTML(s){
       <button class="navitem" id="btnAcc" style="font-size:13px"><span class="ic">${IC.new}</span>${esc(t('add_acc'))}</button>
       <button class="navitem" id="btnOut" style="font-size:13px;color:var(--mut)"><span class="ic">${IC.out}</span>${esc(t('signout'))}</button>
       <div style="padding:2px 10px">${langSeg()}</div>
-      <div class="profoot">${esc(t('pro'))} <a href="mailto:CONTACT_EMAIL">${esc(t('contact'))}</a></div></div></div>`;
+      <div class="profoot">${esc(t('pro'))} <a href="mailto:hqv@haoquangviet.com">${esc(t('contact'))}</a></div></div></div>`;
 }
 function wireRail(root,accounts){
   root.querySelectorAll('[data-n]').forEach(el=>el.onclick=()=>showSession(el.dataset.n));

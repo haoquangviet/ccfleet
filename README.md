@@ -254,7 +254,7 @@ Need more? A commercial edition adds:
 - **Per-project task queue:** tasks are dispatched automatically.
 - **Session recovery:** recover sessions from an old or dead machine's disk.
 
-Contact: <CONTACT_EMAIL>
+Contact: hqv@haoquangviet.com
 
 ## License
 

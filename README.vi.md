@@ -113,7 +113,7 @@ Cần thêm tính năng? Bản thương mại có thêm:
 - **Hàng đợi task theo dự án:** task được tự động giao cho phiên.
 - **Khôi phục phiên:** lấy lại phiên từ ổ cứng của máy cũ hoặc máy hỏng.
 
-Liên hệ: <CONTACT_EMAIL>
+Liên hệ: hqv@haoquangviet.com
 
 ## Giấy phép
 
